@@ -19,7 +19,7 @@ a_Tick_Ms_t a_Tick_GetTick(void)
 
     if (0 != timespec_get(&time, TIME_UTC))
     {
-        tick = (a_Tick_Ms_t)((int64_t)time.tv_sec * A_TICK_MILLISECONDS_TO_SECONDS + (int64_t)time.tv_nsec / A_TICK_NANOSECONDS_TO_MILLISECONDS);
+        tick = (a_Tick_Ms_t)(time.tv_sec * A_TICK_MILLISECONDS_TO_SECONDS + time.tv_nsec / A_TICK_NANOSECONDS_TO_MILLISECONDS);
     }
 
     return tick;
