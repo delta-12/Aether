@@ -28,19 +28,18 @@ typedef struct
     a_Tick_Ms_t last_renew_sent;
     uint8_t *buffer;
     size_t buffer_size;
-} Session_t;
+} a_Session_t;
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif /* __cplusplus */
 
-void a_Session_SetPeerId(const a_Transport_PeerId_t *const id);
 /* TODO use link mode to determine initial state */
-a_Err_t a_Session_Initialize(Session_t *const session, a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size);
+a_Err_t a_Session_Initialize(a_Session_t *const session, a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size);
 /* TODO can probably be removed since sessions will delete themselves from router */
-a_Err_t a_Session_GetState(const Session_t *const session, a_Session_State_t *const state);
-a_Err_t a_Session_Task(Session_t *const session);
+a_Err_t a_Session_GetState(const a_Session_t *const session, a_Session_State_t *const state);
+a_Err_t a_Session_Task(a_Session_t *const session);
 
 #ifdef __cplusplus
 }

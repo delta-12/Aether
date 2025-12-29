@@ -8,11 +8,11 @@
 #define A_SESSION_LEASE_TOLERANCE (a_Tick_Ms_t)10U   /* TODO make sure tolerance is not greater than minimum lease time or make tolerance a percentage */
 #define A_SESSION_DEFAULT_LEASE   (a_Tick_Ms_t)1000U /* TODO */
 
-static a_Err_t a_Session_Connect(Session_t *const session);
-static a_Err_t a_Session_Accept(Session_t *const session);
-static a_Err_t a_Session_Open(Session_t *const session);
+static a_Err_t a_Session_Connect(a_Session_t *const session);
+static a_Err_t a_Session_Accept(a_Session_t *const session);
+static a_Err_t a_Session_Open(a_Session_t *const session);
 
-a_Err_t a_Session_Initialize(Session_t *const session, a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size)
+a_Err_t a_Session_Initialize(a_Session_t *const session, a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size)
 {
     a_Err_t error = A_ERR_NULL;
 
@@ -31,7 +31,7 @@ a_Err_t a_Session_Initialize(Session_t *const session, a_Socket_t *const socket,
     return error;
 }
 
-a_Err_t a_Session_GetState(const Session_t *const session, a_Session_State_t *const state)
+a_Err_t a_Session_GetState(const a_Session_t *const session, a_Session_State_t *const state)
 {
     a_Err_t error = A_ERR_NULL;
 
@@ -44,7 +44,7 @@ a_Err_t a_Session_GetState(const Session_t *const session, a_Session_State_t *co
     return error;
 }
 
-a_Err_t a_Session_Task(Session_t *const session)
+a_Err_t a_Session_Task(a_Session_t *const session)
 {
     a_Err_t error = A_ERR_NONE;
 
@@ -73,7 +73,7 @@ a_Err_t a_Session_Task(Session_t *const session)
     return error;
 }
 
-static a_Err_t a_Session_Connect(Session_t *const session)
+static a_Err_t a_Session_Connect(a_Session_t *const session)
 {
     a_Transport_Message_t message;
     a_Err_t               error = a_Transport_MessageInitialize(&message, session->buffer, session->buffer_size);
@@ -98,7 +98,7 @@ static a_Err_t a_Session_Connect(Session_t *const session)
     return error;
 }
 
-static a_Err_t a_Session_Accept(Session_t *const session)
+static a_Err_t a_Session_Accept(a_Session_t *const session)
 {
     a_Transport_Message_t message;
     a_Err_t               error = a_Transport_MessageInitialize(&message, session->buffer, session->buffer_size);
@@ -150,7 +150,7 @@ static a_Err_t a_Session_Accept(Session_t *const session)
     return error;
 }
 
-static a_Err_t a_Session_Open(Session_t *const session)
+static a_Err_t a_Session_Open(a_Session_t *const session)
 {
     a_Transport_Message_t message;
     a_Err_t               error = a_Transport_MessageInitialize(&message, session->buffer, session->buffer_size);
