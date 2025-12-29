@@ -43,7 +43,7 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
     return error;
 }
 
-a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, a_Socket_t *const socket)
+a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket)
 {
     a_Err_t error = A_ERR_DUPLICATE;
 

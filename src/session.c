@@ -12,7 +12,7 @@ static a_Err_t a_Session_Connect(a_Session_t *const session);
 static a_Err_t a_Session_Accept(a_Session_t *const session);
 static a_Err_t a_Session_Open(a_Session_t *const session);
 
-a_Err_t a_Session_Initialize(a_Session_t *const session, a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size)
+a_Err_t a_Session_Initialize(a_Session_t *const session, const a_Socket_t *const socket, uint8_t *const buffer, const size_t buffer_size)
 {
     a_Err_t error = A_ERR_NULL;
 
