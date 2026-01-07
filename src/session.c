@@ -1,6 +1,7 @@
 #include "session.h"
 
 #include "err.h"
+#include "random.h"
 #include "router.h"
 #include "socket.h"
 #include "transport.h"
@@ -16,8 +17,9 @@ a_Err_t a_Session_Initialize(a_Session_t *const session, const a_Socket_t *const
 {
     a_Err_t error = A_ERR_NULL;
 
-    if ((NULL != session) && (NULL != socket))
+    if ((NULL != session) && (NULL != buffer))
     {
+        session->id          = a_Random_Get32() % AETHER_ROUTER_MAX_SESSIONS;
         session->state       = A_SESSION_STATE_CONNECT;
         session->lease       = A_SESSION_DEFAULT_LEASE;
         session->buffer      = buffer;
