@@ -43,7 +43,7 @@ protected:
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer, sizeof(send_buffer), Receive, receive_buffer, sizeof(receive_buffer));
+        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_));
     }
 
     void TearDown() override
@@ -53,8 +53,8 @@ protected:
 
     static MockSocket *mock_socket_;
     a_Socket_t socket_;
-    std::uint8_t send_buffer[SERIAL_TEST_BUFFER_SIZE];
-    std::uint8_t receive_buffer[SERIAL_TEST_BUFFER_SIZE];
+    std::uint8_t send_buffer_[SERIAL_TEST_BUFFER_SIZE];
+    std::uint8_t receive_buffer_[SERIAL_TEST_BUFFER_SIZE];
 };
 
 MockSocket *Serial::mock_socket_ = nullptr;
