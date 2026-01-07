@@ -31,6 +31,7 @@ endif()
 # Aether tests
 ################################################################################
 set(${PROJECT_NAME}_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/aether_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/buffer_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cobs_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/err_tests.cc
