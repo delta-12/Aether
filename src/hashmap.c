@@ -69,7 +69,11 @@ a_Err_t a_Hashmap_Insert(const a_Hashmap_t *const hashmap, const void *const key
         }
         while (0U != column);
 
-        if ((A_ERR_NONE != error) && (empty_column < hashmap->columns))
+        if (A_ERR_NONE == error)
+        {
+            /* Existing entry updated */
+        }
+        else if (empty_column < hashmap->columns)
         {
             a_Hashmap_WriteEntry(hashmap, a_Hashmap_GetColumn(row, empty_column, hashmap->entry_size), key, value);
             error = A_ERR_NONE;

@@ -51,6 +51,10 @@ TEST(Hashmap, Insert)
     ASSERT_EQ(A_ERR_NULL, a_Hashmap_Insert(&hashmap, &key, nullptr));
 
     ASSERT_EQ(A_ERR_NONE, a_Hashmap_Insert(&hashmap, &key, value));
+    ASSERT_EQ(A_ERR_NONE, a_Hashmap_Insert(&hashmap, &key, value));
+
+    value[0U] = 0x10U;
+    ASSERT_EQ(A_ERR_NONE, a_Hashmap_Insert(&hashmap, &key, value));
 
     /* TODO test handling collisions and if table is full */
 }
@@ -67,6 +71,10 @@ TEST(Hashmap, Get)
     ASSERT_EQ(nullptr, a_Hashmap_Get(nullptr, &key));
     ASSERT_EQ(nullptr, a_Hashmap_Get(&hashmap, nullptr));
 
+    ASSERT_THAT(SPAN_FROM_VALUE(a_Hashmap_Get(&hashmap, &key), sizeof(value)), testing::ElementsAreArray(value));
+
+    value[0U] = 0x10U;
+    a_Hashmap_Insert(&hashmap, &key, value);
     ASSERT_THAT(SPAN_FROM_VALUE(a_Hashmap_Get(&hashmap, &key), sizeof(value)), testing::ElementsAreArray(value));
 
     /* TODO */
