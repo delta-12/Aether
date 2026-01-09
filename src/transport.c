@@ -170,6 +170,24 @@ a_Err_t a_Transport_DeserializeMessage(a_Transport_Message_t *const message)
     return error;
 }
 
+a_Err_t a_Transport_CopyMessage(const a_Transport_Message_t *const message, a_Transport_Message_t *const copy)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if ((NULL != message) && (NULL != copy))
+    {
+        copy->header          = message->header;
+        copy->peer_id         = message->peer_id;
+        copy->sequence_number = message->sequence_number;
+        copy->serialized      = message->serialized;
+        copy->deserialized    = message->deserialized;
+
+        error = a_Buffer_Copy(&copy->buffer, &message->buffer);
+    }
+
+    return error;
+}
+
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message)
 {
     bool serialized = false;

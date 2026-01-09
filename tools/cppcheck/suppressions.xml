@@ -22,4 +22,10 @@
         <symbolName>value</symbolName>
     </suppress>
 
+    <!-- Suppress static linkage for functions to be used outside of translation unit -->
+    <suppress>
+        <id>staticFunction</id>
+        <symbolName>a_Buffer_AppendRight</symbolName>
+    </suppress>
+
 </suppressions>

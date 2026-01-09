@@ -91,6 +91,26 @@ TEST(Transport, DeserializeMessage)
     /* TODO verify fields */
 }
 
+TEST(Transport, CopyMessage)
+{
+    a_Transport_Message_t message;
+    std::uint8_t message_buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_Message_t copy;
+    std::uint8_t copy_buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, message_buffer, sizeof(message_buffer));
+    a_Transport_MessageInitialize(&copy, copy_buffer, sizeof(copy_buffer));
+
+    ASSERT_EQ(A_ERR_NULL, a_Transport_CopyMessage(nullptr, &copy));
+    ASSERT_EQ(A_ERR_NULL, a_Transport_CopyMessage(&message, nullptr));
+
+    a_Transport_MessageConnect(&message, 1000U);
+    a_Transport_SerializeMessage(&message, 0x1234U, 0x5678U);
+    ASSERT_EQ(A_ERR_NONE, a_Transport_CopyMessage(&message, &copy));
+    ASSERT_EQ(A_ERR_NONE, a_Transport_DeserializeMessage(&copy));
+    /* TODO verify original message unchanged */
+    /* TODO verify fields */
+}
+
 TEST(Transport, IsMessageSerialized)
 {
     a_Transport_Message_t message;

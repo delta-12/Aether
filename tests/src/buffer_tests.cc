@@ -233,3 +233,35 @@ TEST(Buffer, AppendRight)
     a_Buffer_SetWrite(&append, 1U);
     ASSERT_EQ(A_ERR_SIZE, a_Buffer_AppendRight(&buffer, &append));
 }
+
+TEST(Buffer, Copy)
+{
+    a_Buffer_t buffer;
+    a_Buffer_t copied;
+    std::uint8_t data_buffer[4U] = {0x00U};
+    std::uint8_t data_copied[4U] = {0x01U, 0x02U, 0x03U, 0x04U};
+
+    a_Buffer_Initialize(&buffer, data_buffer, sizeof(data_buffer));
+    a_Buffer_Initialize(&copied, data_copied, sizeof(data_copied));
+    ASSERT_EQ(A_ERR_NULL, a_Buffer_Copy(nullptr, &copied));
+    ASSERT_EQ(A_ERR_NULL, a_Buffer_Copy(&buffer, nullptr));
+    ASSERT_EQ(A_ERR_NULL, a_Buffer_Copy(nullptr, nullptr));
+
+    ASSERT_EQ(A_ERR_NONE, a_Buffer_Copy(&buffer, &copied));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer));
+
+    a_Buffer_SetWrite(&copied, 2U);
+    ASSERT_EQ(A_ERR_NONE, a_Buffer_Copy(&buffer, &copied));
+    ASSERT_EQ(2U, a_Buffer_GetReadSize(&buffer));
+    a_Buffer_SetWrite(&buffer, 2U);
+    ASSERT_EQ(A_ERR_NONE, a_Buffer_Copy(&buffer, &copied));
+    ASSERT_EQ(2U, a_Buffer_GetReadSize(&buffer));
+
+    a_Buffer_Initialize(&copied, data_copied, sizeof(data_copied));
+    a_Buffer_SetWrite(&copied, sizeof(data_copied));
+    ASSERT_EQ(A_ERR_NONE, a_Buffer_Copy(&buffer, &copied));
+    ASSERT_EQ(4U, a_Buffer_GetReadSize(&buffer));
+
+    a_Buffer_Initialize(&buffer, data_buffer, sizeof(data_buffer) - 1U);
+    ASSERT_EQ(A_ERR_SIZE, a_Buffer_Copy(&buffer, &copied));
+}

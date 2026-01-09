@@ -54,6 +54,7 @@ a_Err_t a_Transport_MessageRenew(a_Transport_Message_t *const message);
 /* TODO publish, subscribe messages */
 a_Err_t a_Transport_SerializeMessage(a_Transport_Message_t *const message, const a_Transport_PeerId_t peer_id, const a_Transport_SequenceNumber_t sequence_number);
 a_Err_t a_Transport_DeserializeMessage(a_Transport_Message_t *const message);
+a_Err_t a_Transport_CopyMessage(const a_Transport_Message_t *const message, a_Transport_Message_t *const copy);
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message);
 bool a_Transport_IsMessageDeserialized(const a_Transport_Message_t *const message);
 a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message);

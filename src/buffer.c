@@ -176,3 +176,15 @@ a_Err_t a_Buffer_AppendRight(a_Buffer_t *const buffer, const a_Buffer_t *const a
 
     return error;
 }
+
+a_Err_t a_Buffer_Copy(a_Buffer_t *const buffer, const a_Buffer_t *const copied)
+{
+    a_Err_t error = a_Buffer_Clear(buffer);
+
+    if (A_ERR_NONE == error)
+    {
+        error = a_Buffer_AppendRight(buffer, copied);
+    }
+
+    return error;
+}
