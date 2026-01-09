@@ -24,7 +24,7 @@ a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, uint8_t *const data, co
 a_Err_t a_Hashmap_Insert(const a_Hashmap_t *const hashmap, const void *const key, const void *const value);
 void *a_Hashmap_Get(const a_Hashmap_t *const hashmap, const void *const key);
 a_Err_t a_Hashmap_Remove(const a_Hashmap_t *const hashmap, const void *const key);
-a_Err_t a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, a_Err_t (*callback)(void *key, void *value, const void *const arg), const void *const arg);
+void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *key, void *value, const void *const arg), const void *const arg);
 
 #ifdef __cplusplus
 }

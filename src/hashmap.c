@@ -131,10 +131,8 @@ a_Err_t a_Hashmap_Remove(const a_Hashmap_t *const hashmap, const void *const key
     return error;
 }
 
-a_Err_t a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, a_Err_t (*callback)(void *key, void *value, const void *const arg), const void *const arg)
+void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *key, void *value, const void *const arg), const void *const arg)
 {
-    a_Err_t error = A_ERR_NULL;
-
     if ((NULL != hashmap) && (NULL != callback))
     {
         for (size_t row = 0U; row < hashmap->rows; row++)
@@ -147,18 +145,11 @@ a_Err_t a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, a_Err_t (*callback)(
 
                 if (a_Hashmap_HasEntry(entry, hashmap->key_size))
                 {
-                    error = callback(entry, (entry + hashmap->key_size), arg);
-
-                    if (A_ERR_NONE != error)
-                    {
-                        break;
-                    }
+                    callback(entry, (entry + hashmap->key_size), arg);
                 }
             }
         }
     }
-
-    return error;
 }
 
 static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size)

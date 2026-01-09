@@ -14,8 +14,7 @@
 static a_Hashmap_t a_Sessions;
 static uint8_t     a_SessionsData[(sizeof(a_Router_SessionId_t) + sizeof(a_Session_t)) * AETHER_ROUTER_MAX_SESSIONS];
 
-static a_Err_t a_SessionTaskCallback(void *key, void *value, const void *const arg);
-
+static void a_SessionTaskCallback(void *key, void *value, const void *const arg);
 
 a_Err_t a_Initialize(const a_Transport_PeerId_t id)
 {
@@ -48,9 +47,11 @@ a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t
 
 a_Err_t a_Task(void)
 {
+    a_Hashmap_ForEach(&a_Sessions, a_SessionTaskCallback, NULL);
+
     /* TODO remove dead sessions */
 
-    return a_Hashmap_ForEach(&a_Sessions, a_SessionTaskCallback, NULL);
+    return A_ERR_NONE;
 }
 
 a_Err_t a_Publish(void)
@@ -71,10 +72,11 @@ a_Err_t a_Query(void)
     return A_ERR_NONE;
 }
 
-static a_Err_t a_SessionTaskCallback(void *key, void *value, const void *const arg)
+static void a_SessionTaskCallback(void *key, void *value, const void *const arg)
 {
     A_UNUSED(key);
     A_UNUSED(arg);
 
-    return a_Session_Task(value);
+    /* TODO handle session tasks errors */
+    (void)a_Session_Task(value);
 }
