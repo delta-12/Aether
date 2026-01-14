@@ -7,12 +7,11 @@
 #include <string.h>
 
 #include "err.h"
+#include "hash.h"
 
-#define A_HASHMAP_SENTINEL  0xFFU
-#define A_HASHMAP_HASH_SEED 5381U /* DJB2 seed */
+#define A_HASHMAP_SENTINEL 0xFFU
 
 static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size);
-static unsigned long a_Hashmap_Hash(const void *const key, const size_t size);
 static uint8_t *a_Hashmap_GetRow(const a_Hashmap_t *const hashmap, const void *const key);
 static uint8_t *a_Hashmap_GetColumn(uint8_t *const row, const size_t column, const size_t entry_size);
 static bool a_Hashmap_HasEntry(const uint8_t *const entry, const size_t key_size);
@@ -173,23 +172,9 @@ static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *cons
     }
 }
 
-static unsigned long a_Hashmap_Hash(const void *const key, const size_t size)
-{
-    /* DJB2 Hash Function */
-
-    unsigned long hash = A_HASHMAP_HASH_SEED;
-
-    for (size_t i = 0U; i < size; i++)
-    {
-        hash = ((hash << 5U) + hash) + *((const uint8_t *const)key + i);
-    }
-
-    return hash;
-}
-
 static uint8_t *a_Hashmap_GetRow(const a_Hashmap_t *const hashmap, const void *const key)
 {
-    return hashmap->data + ((a_Hashmap_Hash(key, hashmap->key_size) % hashmap->rows) * hashmap->columns * hashmap->entry_size);
+    return hashmap->data + ((a_Hash_value(key, hashmap->key_size) % hashmap->rows) * hashmap->columns * hashmap->entry_size);
 }
 
 static uint8_t *a_Hashmap_GetColumn(uint8_t *const row, const size_t column, const size_t entry_size)
