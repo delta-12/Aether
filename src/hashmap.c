@@ -174,7 +174,7 @@ static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *cons
 
 static uint8_t *a_Hashmap_GetRow(const a_Hashmap_t *const hashmap, const void *const key)
 {
-    return hashmap->data + ((a_Hash_value(key, hashmap->key_size) % hashmap->rows) * hashmap->columns * hashmap->entry_size);
+    return hashmap->data + ((a_Hash_Value(key, hashmap->key_size) % hashmap->rows) * hashmap->columns * hashmap->entry_size);
 }
 
 static uint8_t *a_Hashmap_GetColumn(uint8_t *const row, const size_t column, const size_t entry_size)
