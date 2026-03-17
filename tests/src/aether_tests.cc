@@ -91,7 +91,7 @@ TEST_F(Aether, Task)
         }
     }
 
-    ASSERT_EQ(A_ERR_NONE, a_Task());
-    ASSERT_EQ(A_ERR_NONE, a_Task());
-    ASSERT_EQ(A_ERR_NONE, a_Task());
+    a_Task();
+    a_Task();
+    a_Task();
 }

@@ -20,8 +20,9 @@ extern "C"
 #endif /* __cplusplus */
 
 a_Err_t a_Initialize(const a_Transport_PeerId_t id);
+void a_Deinitialize(void);
 a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size);
-a_Err_t a_Task(void);
+void a_Task(void);
 a_Err_t a_Publish(void);
 a_Err_t a_Subscribe(void);
 a_Err_t a_Query(void);
