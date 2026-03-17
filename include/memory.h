@@ -5,6 +5,6 @@
 
 void *a_malloc(const size_t size);
 void *a_calloc(const size_t num, const size_t size);
-void a_free(const void *const ptr);
+void a_free(void *ptr);
 
 #endif /* AETHER_MEMORY_H */

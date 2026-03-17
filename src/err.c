@@ -15,6 +15,9 @@ char *a_Err_ToString(const a_Err_t err)
     case A_ERR_SIZE:
         string = "ERR_SIZE";
         break;
+    case A_ERR_MEMORY:
+        string = "ERR_MEMORY";
+        break;
     case A_ERR_SERIALIZATION:
         string = "ERR_SERIALIZATION";
         break;
