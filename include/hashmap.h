@@ -8,11 +8,11 @@
 
 typedef struct
 {
-    uint8_t *data;
     size_t key_size;
-    size_t entry_size;
-    size_t rows;
-    size_t columns;
+    size_t value_size;
+    size_t capacity;
+    size_t size;
+    void **entries;
 } a_Hashmap_t;
 
 #ifdef __cplusplus
@@ -20,10 +20,11 @@ extern "C"
 {
 #endif /* __cplusplus */
 
-a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size, const size_t key_size, const size_t value_size);
-a_Err_t a_Hashmap_Insert(const a_Hashmap_t *const hashmap, const void *const key, const void *const value);
+a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, const size_t key_size, const size_t value_size);
+void a_Hashmap_Deinitialize(a_Hashmap_t *const hashmap);
+a_Err_t a_Hashmap_Insert(a_Hashmap_t *const hashmap, const void *const key, const void *const value);
 void *a_Hashmap_Get(const a_Hashmap_t *const hashmap, const void *const key);
-a_Err_t a_Hashmap_Remove(const a_Hashmap_t *const hashmap, const void *const key);
+a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key);
 void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *key, void *value, const void *const arg), const void *const arg);
 
 #ifdef __cplusplus

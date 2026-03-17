@@ -8,78 +8,110 @@
 
 #include "err.h"
 #include "hash.h"
+#include "memory.h"
 
-#define A_HASHMAP_SENTINEL 0xFFU
+#define A_HASHMAP_RESIZE_THRESHOLD_LOW  0.25
+#define A_HASHMAP_RESIZE_THRESHOLD_HIGH 0.75
+#define A_HASHMAP_RESIZE_FACTOR         2U
 
-static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size);
-static uint8_t *a_Hashmap_GetRow(const a_Hashmap_t *const hashmap, const void *const key);
-static uint8_t *a_Hashmap_GetColumn(uint8_t *const row, const size_t column, const size_t entry_size);
-static bool a_Hashmap_HasEntry(const uint8_t *const entry, const size_t key_size);
-static bool a_Hashmap_HasKey(const uint8_t *const entry, const void *const key, const size_t key_size);
-static void a_Hashmap_WriteEntry(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key, const void *const value);
+static a_Err_t a_Hashmap_Resize(a_Hashmap_t *const hashmap, const size_t capacity);
+static double a_Hashmap_GetSizeFactor(const a_Hashmap_t *const hashmap);
+static size_t a_Hashmap_GetIndex(a_Hashmap_t *const hashmap, const void *const key);
+static void *a_Hashmap_GetEntry(const a_Hashmap_t *const hashmap, const void *const key);
+static void *a_Hashmap_GetEntryValue(const a_Hashmap_t *const hashmap, const uint8_t *const entry);
+static void *a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, const uint8_t *const entry);
+static void a_Hashmap_SetEntryKey(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key);
+static void a_Hashmap_SetEntryValue(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const value);
+static void a_Hashmap_SetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const next);
 
-a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size, const size_t key_size, const size_t value_size)
+a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, const size_t key_size, const size_t value_size)
 {
     a_Err_t error = A_ERR_NONE;
 
-    if ((NULL == hashmap) || (NULL == data))
+    if (NULL == hashmap)
     {
         error = A_ERR_NULL;
     }
-    else if ((0U == size) || (0U == key_size) || (0U == value_size))
+    else if ((0U == key_size) || (0U == value_size))
     {
         error = A_ERR_SIZE;
     }
     else
     {
         hashmap->key_size   = key_size;
-        hashmap->entry_size = hashmap->key_size + value_size;
-        a_Hashmap_SetRowColumnSize(hashmap, data, size);
+        hashmap->value_size = value_size;
+        hashmap->capacity   = 1U;
+        hashmap->size       = 0U;
+        hashmap->entries    = a_calloc(hashmap->capacity, sizeof(void *));
+
+        if (NULL == hashmap->entries)
+        {
+            error = A_ERR_MEMORY;
+        }
     }
 
     return error;
 }
 
-a_Err_t a_Hashmap_Insert(const a_Hashmap_t *const hashmap, const void *const key, const void *const value)
+void a_Hashmap_Deinitialize(a_Hashmap_t *const hashmap)
+{
+    if (NULL != hashmap)
+    {
+        hashmap->capacity = 0U;
+        hashmap->size     = 0U;
+
+        for (size_t i = 0U; i < hashmap->capacity; i++)
+        {
+            void *entry = *(hashmap->entries + i);
+
+            while (NULL != entry)
+            {
+                void *next = a_Hashmap_GetEntryNext(hashmap, entry);
+
+                a_free(entry);
+                entry = next;
+            }
+        }
+    }
+}
+
+a_Err_t a_Hashmap_Insert(a_Hashmap_t *const hashmap, const void *const key, const void *const value)
 {
     a_Err_t error = A_ERR_NULL;
 
     if ((NULL != hashmap) && (NULL != key) && (NULL != value))
     {
-        uint8_t *const row          = a_Hashmap_GetRow(hashmap, key);
-        size_t         empty_column = hashmap->columns;
-        size_t         column       = hashmap->columns;
-        do
-        {
-            column--;
+        error = A_ERR_NONE;
 
-            uint8_t *const entry = a_Hashmap_GetColumn(row, column, hashmap->entry_size);
+        void *entry = a_Hashmap_GetEntry(hashmap, key);
 
-            if (a_Hashmap_HasKey(entry, key, hashmap->key_size))
-            {
-                a_Hashmap_WriteEntry(hashmap, entry, key, value);
-                error = A_ERR_NONE;
-                break;
-            }
-            else if (!a_Hashmap_HasEntry(entry, hashmap->key_size))
-            {
-                empty_column = column;
-            }
-        }
-        while (0U != column);
-
-        if (A_ERR_NONE == error)
+        if (NULL != entry)
         {
-            /* Existing entry updated */
-        }
-        else if (empty_column < hashmap->columns)
-        {
-            a_Hashmap_WriteEntry(hashmap, a_Hashmap_GetColumn(row, empty_column, hashmap->entry_size), key, value);
-            error = A_ERR_NONE;
+            a_Hashmap_SetEntryValue(hashmap, entry, value);
         }
         else
         {
-            error = A_ERR_SIZE;
+            entry = a_calloc(1U, (hashmap->key_size + hashmap->value_size + sizeof(void *)));
+
+            if (NULL == entry)
+            {
+                error = A_ERR_MEMORY;
+            }
+            else
+            {
+                const size_t index = a_Hashmap_GetIndex(hashmap, key);
+
+                a_Hashmap_SetEntryKey(hashmap, entry, key);
+                a_Hashmap_SetEntryValue(hashmap, entry, value);
+                a_Hashmap_SetEntryNext(hashmap, entry, *(hashmap->entries + index));
+                *(hashmap->entries + index) = entry;
+                hashmap->size++;
+
+                if (a_Hashmap_GetSizeFactor(hashmap) > A_HASHMAP_RESIZE_THRESHOLD_HIGH)
+                {
+                    error = a_Hashmap_Resize(hashmap, hashmap->capacity * A_HASHMAP_RESIZE_FACTOR);
+                }
+            }
         }
     }
 
@@ -92,38 +124,44 @@ void *a_Hashmap_Get(const a_Hashmap_t *const hashmap, const void *const key)
 
     if ((NULL != hashmap) && (NULL != key))
     {
-        void *row = a_Hashmap_GetRow(hashmap, key);
+        void *entry = a_Hashmap_GetEntry(hashmap, key);
 
-        for (size_t column = 0U; column < hashmap->columns; column++)
+        if (NULL != entry)
         {
-            uint8_t *const entry = a_Hashmap_GetColumn(row, column, hashmap->entry_size);
-
-            if (0 == memcmp(entry, key, hashmap->key_size))
-            {
-                value = (void *)(entry + hashmap->key_size);
-                break;
-            }
+            value = a_Hashmap_GetEntryValue(hashmap, entry);
         }
     }
 
     return value;
 }
 
-a_Err_t a_Hashmap_Remove(const a_Hashmap_t *const hashmap, const void *const key)
+a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key)
 {
-    a_Err_t error = A_ERR_NONE;
+    a_Err_t error = A_ERR_NULL;
 
-    if ((NULL == hashmap) || (NULL == key))
+    if ((NULL != hashmap) && (NULL != key))
     {
-        error = A_ERR_NULL;
-    }
-    else
-    {
-        uint8_t *const value = a_Hashmap_Get(hashmap, key);
+        error = A_ERR_NONE;
 
-        if (NULL != value)
+        void *entry    = *(hashmap->entries + a_Hashmap_GetIndex(hashmap, key));
+        void *previous = entry;
+
+        while (NULL != entry)
         {
-            memset((value - hashmap->key_size), A_HASHMAP_SENTINEL, hashmap->key_size);
+            if (0 == memcmp(entry, key, hashmap->key_size))
+            {
+                a_Hashmap_SetEntryNext(hashmap, previous, a_Hashmap_GetEntryNext(hashmap, entry));
+                a_free(entry);
+                hashmap->size--;
+
+                if ((a_Hashmap_GetSizeFactor(hashmap) < A_HASHMAP_RESIZE_THRESHOLD_LOW) && (hashmap->size > 0U))
+                {
+                    error = a_Hashmap_Resize(hashmap, hashmap->capacity / A_HASHMAP_RESIZE_FACTOR);
+                }
+            }
+
+            previous = entry;
+            entry    = a_Hashmap_GetEntryNext(hashmap, entry);
         }
     }
 
@@ -134,77 +172,98 @@ void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *
 {
     if ((NULL != hashmap) && (NULL != callback))
     {
-        for (size_t row = 0U; row < hashmap->rows; row++)
+        for (size_t i = 0U; i < hashmap->capacity; i++)
         {
-            uint8_t *const row_data = hashmap->data + (row * hashmap->columns * hashmap->entry_size);
+            void *entry = *(hashmap->entries + i);
 
-            for (size_t column = 0U; column < hashmap->columns; column++)
+            while (NULL != entry)
             {
-                uint8_t *const entry = a_Hashmap_GetColumn(row_data, column, hashmap->entry_size);
-
-                if (a_Hashmap_HasEntry(entry, hashmap->key_size))
-                {
-                    callback(entry, (entry + hashmap->key_size), arg);
-                }
+                callback(entry, a_Hashmap_GetEntryValue(hashmap, entry), arg);
+                entry = a_Hashmap_GetEntryNext(hashmap, entry);
             }
         }
     }
 }
 
-static void a_Hashmap_SetRowColumnSize(a_Hashmap_t *const hashmap, uint8_t *const data, const size_t size)
+static a_Err_t a_Hashmap_Resize(a_Hashmap_t *const hashmap, const size_t capacity)
 {
-    const size_t max_entries = size / hashmap->entry_size;
-    const size_t max_columns = (size_t)sqrt((double)max_entries);
-    hashmap->data    = data;
-    hashmap->rows    = max_entries;
-    hashmap->columns = 1U;
+    a_Err_t error       = A_ERR_MEMORY;
+    void ** new_entries = a_calloc(capacity, sizeof(void *));
 
-    memset(data, A_HASHMAP_SENTINEL, size);
-
-    for (size_t columns = max_columns; columns >= 2U; columns--)
+    if (NULL != new_entries)
     {
-        if (max_entries % columns == 0)
+        for (size_t i = 0; i < hashmap->capacity; i++)
         {
-            hashmap->columns = columns;
-            hashmap->rows    = max_entries / columns;
-            break;
+            void *entry = *(hashmap->entries + i);
+
+            while (NULL != entry)
+            {
+                void **new_entry = new_entries + a_Hashmap_GetIndex(hashmap, entry);
+                void * next      = a_Hashmap_GetEntryNext(hashmap, entry);
+
+                a_Hashmap_SetEntryNext(hashmap, entry, *new_entry);
+                *new_entries = entry;
+                entry        = next;
+            }
         }
-    }
-}
 
-static uint8_t *a_Hashmap_GetRow(const a_Hashmap_t *const hashmap, const void *const key)
-{
-    return hashmap->data + ((a_Hash_Value(key, hashmap->key_size) % hashmap->rows) * hashmap->columns * hashmap->entry_size);
-}
-
-static uint8_t *a_Hashmap_GetColumn(uint8_t *const row, const size_t column, const size_t entry_size)
-{
-    return row + (entry_size * column);
-}
-
-static bool a_Hashmap_HasEntry(const uint8_t *const entry, const size_t key_size)
-{
-    bool has_entry = false;
-
-    for (size_t i = 0U; i < key_size; i++)
-    {
-        if (A_HASHMAP_SENTINEL != *(entry + i))
-        {
-            has_entry = true;
-            break;
-        }
+        free(hashmap->entries);
+        hashmap->entries  = new_entries;
+        hashmap->capacity = capacity;
+        error             = A_ERR_NONE;
     }
 
-    return has_entry;
+    return error;
 }
 
-static bool a_Hashmap_HasKey(const uint8_t *const entry, const void *const key, const size_t key_size)
+static double a_Hashmap_GetSizeFactor(const a_Hashmap_t *const hashmap)
 {
-    return 0 == memcmp(entry, key, key_size);
+    return (double)hashmap->size / (double)hashmap->capacity;
 }
 
-static void a_Hashmap_WriteEntry(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key, const void *const value)
+static size_t a_Hashmap_GetIndex(a_Hashmap_t *const hashmap, const void *const key)
+{
+    return (size_t)a_Hash_Value(key, hashmap->key_size) % hashmap->capacity;
+}
+
+static void *a_Hashmap_GetEntry(const a_Hashmap_t *const hashmap, const void *const key)
+{
+    void *entry = *(hashmap->entries + a_Hashmap_GetIndex(hashmap, key));
+
+    while (NULL != entry)
+    {
+        if (0 == memcmp(entry, key, hashmap->key_size))
+        {
+            break;
+        }
+
+        entry = a_Hashmap_GetEntryNext(hashmap, entry);
+    }
+
+    return entry;
+}
+
+static void *a_Hashmap_GetEntryValue(const a_Hashmap_t *const hashmap, const uint8_t *const entry)
+{
+    return entry + hashmap->key_size;
+}
+
+static void *a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, const uint8_t *const entry)
+{
+    return entry + (hashmap->key_size + hashmap->value_size);
+}
+
+static void a_Hashmap_SetEntryKey(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key)
 {
     memcpy(entry, key, hashmap->key_size);
-    memcpy((entry + hashmap->key_size), value, (hashmap->entry_size - hashmap->key_size));
+}
+
+static void a_Hashmap_SetEntryValue(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const value)
+{
+    memcpy(a_Hashmap_GetEntryValue(hashmap, entry), value, hashmap->value_size);
+}
+
+static void a_Hashmap_SetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const next)
+{
+    memcpy(a_Hashmap_GetEntryNext(hashmap, entry), &next, sizeof(void *));
 }
