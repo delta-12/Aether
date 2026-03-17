@@ -19,7 +19,7 @@ static double a_Hashmap_GetSizeFactor(const a_Hashmap_t *const hashmap);
 static size_t a_Hashmap_GetIndex(const a_Hashmap_t *const hashmap, const void *const key);
 static void *a_Hashmap_GetEntry(const a_Hashmap_t *const hashmap, const void *const key);
 static void *a_Hashmap_GetEntryValue(const a_Hashmap_t *const hashmap, uint8_t *const entry);
-static void *a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry);
+static void **a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry);
 static void a_Hashmap_SetEntryKey(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key);
 static void a_Hashmap_SetEntryValue(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const value);
 static void a_Hashmap_SetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const next);
@@ -66,7 +66,7 @@ void a_Hashmap_Deinitialize(a_Hashmap_t *const hashmap)
 
             while (NULL != entry)
             {
-                void *next = a_Hashmap_GetEntryNext(hashmap, entry);
+                void *next = *a_Hashmap_GetEntryNext(hashmap, entry);
 
                 a_free(entry);
                 entry = next;
@@ -143,14 +143,14 @@ a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key)
     {
         error = A_ERR_NONE;
 
-        void *entry    = *(hashmap->entries + a_Hashmap_GetIndex(hashmap, key));
-        void *previous = entry;
+        void **previous = hashmap->entries + a_Hashmap_GetIndex(hashmap, key);
+        void * entry    = *previous;
 
         while (NULL != entry)
         {
             if (0 == memcmp(entry, key, hashmap->key_size))
             {
-                a_Hashmap_SetEntryNext(hashmap, previous, a_Hashmap_GetEntryNext(hashmap, entry));
+                *previous = *a_Hashmap_GetEntryNext(hashmap, entry);
                 a_free(entry);
                 hashmap->size--;
 
@@ -158,10 +158,12 @@ a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key)
                 {
                     error = a_Hashmap_Resize(hashmap, hashmap->capacity / A_HASHMAP_RESIZE_FACTOR);
                 }
+
+                break;
             }
 
-            previous = entry;
-            entry    = a_Hashmap_GetEntryNext(hashmap, entry);
+            previous = a_Hashmap_GetEntryNext(hashmap, entry);
+            entry    = *previous;
         }
     }
 
@@ -179,7 +181,7 @@ void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *
             while (NULL != entry)
             {
                 callback(entry, a_Hashmap_GetEntryValue(hashmap, entry), arg);
-                entry = a_Hashmap_GetEntryNext(hashmap, entry);
+                entry = *a_Hashmap_GetEntryNext(hashmap, entry);
             }
         }
     }
@@ -198,12 +200,12 @@ static a_Err_t a_Hashmap_Resize(a_Hashmap_t *const hashmap, const size_t capacit
 
             while (NULL != entry)
             {
-                void **new_entry = new_entries + a_Hashmap_GetIndex(hashmap, entry);
-                void * next      = a_Hashmap_GetEntryNext(hashmap, entry);
+                void **new_entry = new_entries + ((size_t)a_Hash_Value(entry, hashmap->key_size) % capacity);
+                void * next      = *a_Hashmap_GetEntryNext(hashmap, entry);
 
                 a_Hashmap_SetEntryNext(hashmap, entry, *new_entry);
-                *new_entries = entry;
-                entry        = next;
+                *new_entry = entry;
+                entry      = next;
             }
         }
 
@@ -237,7 +239,7 @@ static void *a_Hashmap_GetEntry(const a_Hashmap_t *const hashmap, const void *co
             break;
         }
 
-        entry = a_Hashmap_GetEntryNext(hashmap, entry);
+        entry = *a_Hashmap_GetEntryNext(hashmap, entry);
     }
 
     return entry;
@@ -248,9 +250,9 @@ static void *a_Hashmap_GetEntryValue(const a_Hashmap_t *const hashmap, uint8_t *
     return entry + hashmap->key_size;
 }
 
-static void *a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry)
+static void **a_Hashmap_GetEntryNext(const a_Hashmap_t *const hashmap, uint8_t *const entry)
 {
-    return entry + (hashmap->key_size + hashmap->value_size);
+    return (void **)(entry + (hashmap->key_size + hashmap->value_size));
 }
 
 static void a_Hashmap_SetEntryKey(const a_Hashmap_t *const hashmap, uint8_t *const entry, const void *const key)
