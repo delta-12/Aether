@@ -2,6 +2,9 @@
 _build
 build
 
+# CMake
+CMakeUserPresets.json
+
 # Test code
 _*
 
