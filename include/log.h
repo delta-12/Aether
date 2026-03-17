@@ -13,9 +13,18 @@ typedef enum
     A_LOG_LEVEL_MAX
 } a_Log_Level_t;
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif /* __cplusplus */
+
 void a_Log_SetLogLevel(const a_Log_Level_t level);
 void a_Log_RegisterCustomLogger(void (*log)(const char *const tag, const a_Log_Level_t level, char *const format, ...));
 void a_Log(const char *const tag, const a_Log_Level_t level, char *const format, ...);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #define A_LOG_ERROR(tag, format, ...)   a_Log(tag, A_LOG_LEVEL_ERROR, format, ## __VA_ARGS__)
 #define A_LOG_WARNING(tag, format, ...) a_Log(tag, A_LOG_LEVEL_WARNING, format, ## __VA_ARGS__)
