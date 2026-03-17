@@ -10,7 +10,7 @@ extern "C"
 
 void *a_malloc(const size_t size);
 void *a_calloc(const size_t num, const size_t size);
-void a_free(void *ptr);
+void a_free(void *const ptr);
 
 #ifdef __cplusplus
 }

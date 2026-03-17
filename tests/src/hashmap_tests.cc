@@ -9,12 +9,19 @@
 
 #define SPAN_FROM_VALUE(value, size) std::span<std::uint8_t>(static_cast<std::uint8_t *>(value), size)
 
-/* TODO deinit hashmap after each test, run with valgrind */
-
-TEST(Hashmap, Initialize)
+class Hashmap : public testing::Test
 {
-    a_Hashmap_t hashmap;
+protected:
+    void TearDown() override
+    {
+        a_Hashmap_Deinitialize(&hashmap);
+    }
 
+    a_Hashmap_t hashmap;
+};
+
+TEST_F(Hashmap, Initialize)
+{
     ASSERT_EQ(A_ERR_NULL, a_Hashmap_Initialize(nullptr, sizeof(std::uint32_t), 10U));
 
     ASSERT_EQ(A_ERR_SIZE, a_Hashmap_Initialize(&hashmap, 0U, 10U));
@@ -23,9 +30,8 @@ TEST(Hashmap, Initialize)
     ASSERT_EQ(A_ERR_NONE, a_Hashmap_Initialize(&hashmap, sizeof(std::uint32_t), 10U));
 }
 
-TEST(Hashmap, Insert)
+TEST_F(Hashmap, Insert)
 {
-    a_Hashmap_t hashmap;
     std::uint32_t key = 0x12345678U;
     std::uint8_t value[10U] = {0x00U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U, 0x06U, 0x07U, 0x08U, 0x09U};
     a_Hashmap_Initialize(&hashmap, sizeof(std::uint32_t), 10U);
@@ -43,9 +49,8 @@ TEST(Hashmap, Insert)
     /* TODO test handling collisions and if table is full */
 }
 
-TEST(Hashmap, Get)
+TEST_F(Hashmap, Get)
 {
-    a_Hashmap_t hashmap;
     std::uint32_t key_0 = 0x12345678U;
     std::uint8_t value_0[10U] = {0x00U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U, 0x06U, 0x07U, 0x08U, 0x09U};
     std::uint32_t key_1 = 0x91011121U;
@@ -70,9 +75,8 @@ TEST(Hashmap, Get)
     /* TODO */
 }
 
-TEST(Hashmap, Remove)
+TEST_F(Hashmap, Remove)
 {
-    a_Hashmap_t hashmap;
     std::uint32_t key = 0x12345678U;
     std::uint8_t value[10U] = {0x00U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U, 0x06U, 0x07U, 0x08U, 0x09U};
     a_Hashmap_Initialize(&hashmap, sizeof(std::uint32_t), 10U);

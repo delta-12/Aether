@@ -43,7 +43,7 @@ void *a_calloc(const size_t num, const size_t size)
 #endif /* AETHER_MEMORY_STATIC_ALLOCATOR */
 }
 
-void a_free(void *ptr)
+void a_free(void *const ptr)
 {
 #ifdef AETHER_MEMORY_STATIC_ALLOCATOR
     /* TODO */

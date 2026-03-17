@@ -13,6 +13,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 option(AETHER_BUILD_TESTS "Build Aether tests" OFF)
+option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
 
 ################################################################################
 # Versioning
@@ -88,11 +89,20 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE
             -Wall -Wextra -Werror -Wpedantic
-            $<$<CONFIG:Debug>:-g -O0 --coverage>
+            $<$<CONFIG:Debug>:-g --coverage>
+            $<$<CONFIG:Debug>:
+                $<IF:$<BOOL:${AETHER_ENABLE_ASAN}>,-O1,-O0>
+            >
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address -fno-omit-frame-pointer
+            >
     )
     target_link_options(${PROJECT_NAME}
         PRIVATE
             $<$<CONFIG:Debug>:--coverage>
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address
+            >
     )
 # Add flags for other compilers here
 endif()
