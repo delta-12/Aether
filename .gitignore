@@ -2,6 +2,9 @@
 _build
 build
 
+# Test code
+_*
+
 # Version header
 include/version.h
 
