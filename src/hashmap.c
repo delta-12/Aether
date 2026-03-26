@@ -238,7 +238,7 @@ static a_Err_t a_Hashmap_Resize(a_Hashmap_t *const hashmap, const size_t capacit
 
             while (NULL != entry)
             {
-                a_Hashmap_Entry_t **new_entry = new_entries + ((size_t)a_Hash_Value(entry->key, entry->key_size) % capacity);
+                a_Hashmap_Entry_t **new_entry = new_entries + (a_Hash_Value(entry->key, entry->key_size) % capacity);
                 a_Hashmap_Entry_t * next      = entry->next;
 
                 entry->next = *new_entry;
@@ -265,7 +265,7 @@ static double a_Hashmap_GetSizeFactor(const a_Hashmap_t *const hashmap)
 
 static size_t a_Hashmap_GetIndex(const a_Hashmap_t *const hashmap, const void *const key, const size_t key_size)
 {
-    return (size_t)a_Hash_Value(key, key_size) % hashmap->capacity;
+    return a_Hash_Value(key, key_size) % hashmap->capacity;
 }
 
 static a_Hashmap_Entry_t *a_Hashmap_GetEntry(const a_Hashmap_t *const hashmap, const void *const key, const size_t key_size)

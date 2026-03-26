@@ -84,7 +84,7 @@ void a_Log_RegisterCustomLogger(void (*log)(const char *const tag, const a_Log_L
 #endif /* AETHER_LOG_ENABLED */
 }
 
-void a_Log(const char *const tag, const a_Log_Level_t level, char *const format, ...)
+void a_Log(const char *const tag, const a_Log_Level_t level, const char *const format, ...)
 {
 #ifdef AETHER_LOG_ENABLED
     if ((NULL != tag) && (NULL != format) && (level <= a_Log_Level))

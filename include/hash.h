@@ -1,7 +1,10 @@
 #ifndef AETHER_HASH_H
 #define AETHER_HASH_H
 
+#include <limits.h>
 #include <stddef.h>
+
+#define A_HASH_MAX ULONG_MAX
 
 typedef unsigned long a_Hash_t;
 

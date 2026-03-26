@@ -7,6 +7,7 @@
 
 #include "buffer.h"
 #include "err.h"
+#include "hash.h"
 #include "leb128.h"
 #include "tick.h"
 
@@ -121,16 +122,34 @@ a_Err_t a_Transport_MessageRenew(a_Transport_Message_t *const message)
     return error;
 }
 
-a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const uint64_t key_hash, const uint8_t *const data, const size_t size)
+a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const char *const key, const uint8_t *const data, const size_t data_size)
 {
-    A_UNUSED(message);
-    A_UNUSED(key_hash);
-    A_UNUSED(data);
-    A_UNUSED(size);
+    a_Err_t error = A_ERR_NONE;
 
-    /* TODO */
+    if ((NULL == message) || (NULL == key) || (NULL == data))
+    {
+        error = A_ERR_NULL;
+    }
+    else if ((0U == data_size) || (data_size > A_TRANSPORT_MAX_STRING_SIZE))
+    {
+        error = A_ERR_SIZE;
+    }
+    else
+    {
+        const uint64_t key_hash = a_Hash_String(key);
 
-    return A_ERR_MAX;
+        message->header = A_TRANSPORT_HEADER_PUBLISH;
+
+        (void)a_Buffer_Clear(&message->buffer);
+
+        size_t size = Leb128_Encode64(key_hash, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        (void)a_Buffer_SetWrite(&message->buffer, size);
+
+        memcpy(a_Buffer_GetWrite(&message->buffer), data, data_size);
+        (void)a_Buffer_SetWrite(&message->buffer, data_size);
+    }
+
+    return error;
 }
 
 a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const char *const key)
@@ -139,7 +158,7 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
 
     if ((NULL != message) && (NULL != key))
     {
-        const uint64_t key_size = (uint64_t)(strlen(key) + 1U);
+        const uint64_t key_size = strnlen(key, A_TRANSPORT_MAX_STRING_SIZE) + 1U;
 
         if (key_size > A_TRANSPORT_MAX_STRING_SIZE)
         {
@@ -360,28 +379,81 @@ a_Tick_Ms_t a_Transport_GetMessageLease(a_Transport_Message_t *const message)
     return lease;
 }
 
+size_t a_Transport_GetMessageKeySize(a_Transport_Message_t *const message)
+{
+    size_t key_size = SIZE_MAX;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
+    {
+        const size_t size = Leb128_Decode64(&key_size, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+
+        if (SIZE_MAX != size)
+        {
+            (void)a_Buffer_SetRead(&message->buffer, size);
+        }
+        else
+        {
+            key_size = SIZE_MAX;
+        }
+    }
+
+    return key_size;
+}
+
 char *a_Transport_GetMessageKey(a_Transport_Message_t *const message)
 {
     char *key = NULL;
 
     if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
     {
-        size_t       key_size = 0U;
-        const size_t size     = Leb128_Decode64(&key_size, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
-
-        (void)a_Buffer_SetRead(&message->buffer, size);
-
+        /* TODO return NULL if string is not valid, i.e. not null terminated */
         key = (char *)a_Buffer_GetRead(&message->buffer);
     }
 
     return key;
 }
 
-a_Buffer_t *a_Transport_GetMessageData(a_Transport_Message_t *const message)
+a_Hash_t a_Transport_GetMessageKeyHash(a_Transport_Message_t *const message)
 {
-    A_UNUSED(message);
+    size_t key_hash = A_HASH_MAX;
 
-    /* TODO */
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        const size_t size = Leb128_Decode64(&key_hash, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
 
-    return NULL;
+        if (SIZE_MAX != size)
+        {
+            (void)a_Buffer_SetRead(&message->buffer, size);
+        }
+        else
+        {
+            key_hash = A_HASH_MAX;
+        }
+    }
+
+    return key_hash;
+}
+
+size_t a_Transport_GetMessageDataSize(a_Transport_Message_t *const message)
+{
+    size_t data_size = SIZE_MAX;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        data_size = a_Buffer_GetReadSize(&message->buffer);
+    }
+
+    return data_size;
+}
+
+uint8_t *a_Transport_GetMessageData(a_Transport_Message_t *const message)
+{
+    uint8_t *data = NULL;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        data = a_Buffer_GetRead(&message->buffer);
+    }
+
+    return data;
 }

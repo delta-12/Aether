@@ -20,7 +20,7 @@ extern "C"
 
 void a_Log_SetLogLevel(const a_Log_Level_t level);
 void a_Log_RegisterCustomLogger(void (*log)(const char *const tag, const a_Log_Level_t level, char *const format, ...));
-void a_Log(const char *const tag, const a_Log_Level_t level, char *const format, ...);
+void a_Log(const char *const tag, const a_Log_Level_t level, const char *const format, ...);
 
 #ifdef __cplusplus
 }
