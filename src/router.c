@@ -20,6 +20,8 @@
 #define AETHER_SESSION_LEASE (a_Tick_Ms_t)500U
 #endif /* AETHER_SESSION_LEASE */
 
+typedef struct a_Router_SubscriberSession a_Router_SubscriberSession_t;
+
 typedef enum
 {
     A_ROUTER_SESSION_STATE_CONNECT,
@@ -40,19 +42,32 @@ typedef struct
     a_Transport_Message_t message;
 } a_Router_Session_t;
 
+// typedef struct
+// {
+//     void (*function)(const char *const key, const uint8_t *const data, const size_t size, void *arg);
+//     void *arg;
+// } a_Router_SubscriptionCallback_t;
+
+struct a_Router_SubscriberSession
+{
+    a_Router_SessionId_t id;
+    a_Router_SubscriberSession_t *next;
+};
+
 typedef struct
 {
+    a_Router_SubscriberSession_t *sessions;
     void (*function)(const char *const key, const uint8_t *const data, const size_t size, void *arg);
     void *arg;
-} a_Router_SubscriptionCallback_t;
+} a_Router_Subscription_t;
 
 static const char *const            a_Router_LogTag         = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
-static a_Hashmap_t                  a_Router_Keys;
-static a_Hashmap_t                  a_Router_Subscriptions;
+// static a_Hashmap_t                  a_Router_Keys;
+static a_Hashmap_t a_Router_Subscriptions;
 // static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
@@ -76,7 +91,7 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
         a_Router_PeerId = id;
     }
 
-    A_LOG_DEBUG(a_Router_LogTag, "Peer ID set to %d", a_Router_PeerId);
+    A_LOG_DEBUG(a_Router_LogTag, "Peer ID set to %#x", a_Router_PeerId);
 
     a_Err_t error = a_Hashmap_Initialize(&a_Router_Sessions);
 
@@ -85,10 +100,10 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
         error = a_Hashmap_Initialize(&a_Router_SequenceNumbers);
     }
 
-    if (A_ERR_NONE == error)
-    {
-        error = a_Hashmap_Initialize(&a_Router_Keys);
-    }
+    // if (A_ERR_NONE == error)
+    // {
+    //     error = a_Hashmap_Initialize(&a_Router_Keys);
+    // }
 
     if (A_ERR_NONE == error)
     {
@@ -107,7 +122,7 @@ void a_Router_Deinitialize(void)
 {
     a_Hashmap_Deinitialize(&a_Router_Sessions);
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
-    a_Hashmap_Deinitialize(&a_Router_Keys);
+    // a_Hashmap_Deinitialize(&a_Router_Keys);
     a_Hashmap_Deinitialize(&a_Router_Subscriptions);
     /* TODO deinitialize trie */
 }
@@ -156,7 +171,7 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         (void)a_Transport_MessageClose(&session->message);
         error = a_Router_SessionMessageSend(id, session);
 
-        // a_Hashmap_ForEach(&a_Router_Subscribers, a_Router_RemoveSubscriberCallback, &id); /* TODO remove any callbacks associated with session if applicable */
+        /* TODO remove session from all subscriptions */
         if (A_ERR_NONE == error)
         {
             error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
@@ -177,29 +192,86 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
 a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const size_t size)
 {
-    A_UNUSED(key);
-    A_UNUSED(data);
-    A_UNUSED(size);
+    a_Err_t error = A_ERR_NONE;
 
-    /* TODO */
+    if ((NULL == key) || (NULL == data))
+    {
+        error = A_ERR_NULL;
+    }
+    else if (0U == size)
+    {
+        error = A_ERR_SIZE;
+    }
+    else
+    {
+        const a_Hash_t           hash         = a_Hash_String(key);
+        a_Router_Subscription_t *subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
-    return A_ERR_MAX;
+        if (NULL != subscription)
+        {
+            a_Router_SubscriberSession_t *subscriber_session = subscription->sessions;
+
+            while (NULL != subscriber_session)
+            {
+                a_Router_Session_t *session = a_Hashmap_Get(&a_Router_Sessions, &subscriber_session->id, sizeof(subscriber_session->id));
+
+                a_Transport_MessageReset(&session->message);
+                a_Err_t send_error = a_Transport_MessagePublish(&session->message, key, data, size);
+
+                if (A_ERR_NONE == send_error)
+                {
+                    (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+                    send_error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+                }
+
+                if (A_ERR_NONE != send_error)
+                {
+                    error = send_error;
+                }
+
+                subscriber_session = subscriber_session->next;
+            }
+        }
+    }
+
+    return error;
 }
 
 a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg)
 {
-    const a_Hash_t                        hash                  = a_Hash_Value(key, strlen(key) + 1U);
-    const a_Router_SubscriptionCallback_t subscription_callback = {
-        .function = callback,
-        .arg      = arg,
-    };
+    a_Err_t error = A_ERR_NONE;
 
-    a_Err_t error = a_Hashmap_Insert(&a_Router_Subscriptions, &hash, sizeof(hash), &subscription_callback, sizeof(subscription_callback));
-
-    if (A_ERR_NONE == error)
+    if ((NULL == key) || (NULL == callback))
     {
-        a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSubscribeCallback, key);
-        a_Router_SequenceNumber++;
+        error = A_ERR_NULL;
+    }
+    else
+    {
+        const a_Hash_t           hash         = a_Hash_String(key);
+        a_Router_Subscription_t *subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
+
+        if (NULL == subscription)
+        {
+            a_Router_Subscription_t new_subscription = {
+                .sessions = NULL,
+                .function = callback,
+                .arg      = arg
+            };
+
+            error = a_Hashmap_Insert(&a_Router_Subscriptions, &hash, sizeof(hash), &new_subscription, sizeof(new_subscription));
+        }
+        else
+        {
+            subscription->function = callback;
+            subscription->arg      = arg;
+        }
+
+        if (A_ERR_NONE == error)
+        {
+            a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSubscribeCallback, key);
+            a_Router_SequenceNumber++;
+        }
     }
 
     return error;
@@ -418,10 +490,11 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             session->last_renew_received = tick;
             break;
         case A_TRANSPORT_HEADER_SUBSCRIBE:
-            /* TODO */
+            /* TODO add session as subscriber to key, forward to all other sessions */
+            /* TODO add hash to keys lookup */
             break;
         case A_TRANSPORT_HEADER_PUBLISH:
-            /* TODO */
+            /* TODO call callback if subscribed, forward to any other subscribed sessions */
             break;
         case A_TRANSPORT_HEADER_CONNECT:
         case A_TRANSPORT_HEADER_ACCEPT:
@@ -457,10 +530,15 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
     a_Router_Session_t *const session = value;
 
     a_Transport_MessageReset(&session->message);
-    a_Transport_MessageSubscribe(&session->message, arg);
-    (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
 
-    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+    a_Err_t error = a_Transport_MessageSubscribe(&session->message, arg);
+
+    if (A_ERR_NONE == error)
+    {
+        (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+        error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+    }
 
     if (A_ERR_NONE != error)
     {
