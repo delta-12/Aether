@@ -8,7 +8,6 @@
 #include "hashmap.h"
 #include "log.h"
 #include "random.h"
-#include "set.h"
 #include "socket.h"
 #include "tick.h"
 #include "transport.h"
@@ -57,10 +56,11 @@ static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
-static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
+// static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
-static a_Err_t a_Router_SessionMessageGet(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static void a_Router_SessionTaskCallback(void *key, void *value, const void *const arg);
 static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -89,7 +89,7 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 
     if (A_ERR_NONE == error)
     {
-        error = a_Hashmap_Initialize(&a_Router_Subscribers, sizeof(a_Hash_t), sizeof(a_Set_t));
+        /* TODO initialize trie */
     }
 
     return error;
@@ -99,7 +99,7 @@ void a_Router_Deinitialize(void)
 {
     a_Hashmap_Deinitialize(&a_Router_Sessions);
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
-    a_Hashmap_Deinitialize(&a_Router_Subscribers);
+    /* TODO deinitialize trie */
 }
 
 void a_Router_Task(void)
@@ -124,7 +124,7 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
         {
             a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id);
 
-            /* TODO initialize hashmap*/
+            /* TODO initialize session hashmap*/
             /* TODO set maximum key string size */
             new_session->socket = *socket;
             new_session->state  = A_ROUTER_SESSION_STATE_CONNECT;
@@ -140,15 +140,28 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
 
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 {
-    a_Err_t                         error   = A_ERR_NONE;
-    const a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id);
+    a_Err_t                   error   = A_ERR_NONE;
+    a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id);
 
     if (NULL != session)
     {
-        /* TODO attempt to close session gracefully, i.e. send close message */
-        // a_Hashmap_ForEach(&a_Router_Subscribers, a_Router_RemoveSubscriberCallback, &id); /* TODO remove any callbacks associated with session if applicable */
-        error = a_Hashmap_Remove(&a_Router_Sessions, &id);
+        a_Transport_MessageReset(&session->message);
+        (void)a_Transport_MessageClose(&session->message);
+        error = a_Router_SessionMessageSend(id, session);
 
+        // a_Hashmap_ForEach(&a_Router_Subscribers, a_Router_RemoveSubscriberCallback, &id); /* TODO remove any callbacks associated with session if applicable */
+        if (A_ERR_NONE == error)
+        {
+            error = a_Hashmap_Remove(&a_Router_Sessions, &id);
+        }
+    }
+
+    if (A_ERR_NONE != error)
+    {
+        A_LOG_ERROR(a_Router_LogTag, "Session %d failed to delete with error %s", id, a_Err_ToString(error));
+    }
+    else
+    {
         A_LOG_DEBUG(a_Router_LogTag, "Session %d deleted", id);
     }
 
@@ -161,7 +174,21 @@ static void a_Router_SerializeMessage(a_Transport_Message_t *const message)
     a_Router_SequenceNumber++;
 }
 
-static a_Err_t a_Router_SessionMessageGet(const a_Router_SessionId_t id, a_Router_Session_t *const session)
+static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session)
+{
+    a_Router_SerializeMessage(&session->message);
+
+    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+
+    if (A_ERR_NONE != error)
+    {
+        A_LOG_ERROR(a_Router_LogTag, "Session %d sending message with error %s", id, a_Err_ToString(error));
+    }
+
+    return error;
+}
+
+static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
     a_Transport_MessageReset(&session->message);
 
@@ -240,9 +267,8 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
 {
     a_Transport_MessageReset(&session->message);
     (void)a_Transport_MessageConnect(&session->message, session->lease);
-    a_Router_SerializeMessage(&session->message);
 
-    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+    a_Err_t error = a_Router_SessionMessageSend(id, session);
 
     if (A_ERR_NONE == error)
     {
@@ -278,7 +304,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
         }
         else
         {
-            error = a_Router_SessionMessageGet(id, session);
+            error = a_Router_SessionMessageReceive(id, session);
 
             if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
             {
@@ -296,8 +322,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
                 session->last_renew_received = tick;
 
                 (void)a_Transport_MessageAccept(&session->message, session->lease);
-                a_Router_SerializeMessage(&session->message);
-                error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+                error = a_Router_SessionMessageSend(id, session);
             }
             else if ((A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message)) && (a_Transport_GetMessageLease(&session->message) == session->lease))
             {
@@ -334,7 +359,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
 
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    a_Err_t           error = a_Router_SessionMessageGet(id, session);
+    a_Err_t           error = a_Router_SessionMessageReceive(id, session);
     const a_Tick_Ms_t tick  = a_Tick_GetTick();
 
     if (A_ERR_NONE != error)
@@ -377,8 +402,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     {
         a_Transport_MessageReset(&session->message);
         (void)a_Transport_MessageRenew(&session->message);
-        a_Router_SerializeMessage(&session->message);
-        error                    = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+        error                    = a_Router_SessionMessageSend(id, session);
         session->last_renew_sent = tick;
     }
 
