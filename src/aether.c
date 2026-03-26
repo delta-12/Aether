@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "err.h"
+#include "log.h"
 #include "random.h"
 #include "router.h"
 #include "socket.h"
@@ -19,6 +20,11 @@ a_Err_t a_Initialize(const a_Transport_PeerId_t id)
 void a_Deinitialize(void)
 {
     a_Router_Deinitialize();
+}
+
+void a_SetLogLevel(const a_Log_Level_t level)
+{
+    a_Log_SetLogLevel(level);
 }
 
 a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size)

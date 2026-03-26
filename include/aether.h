@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "err.h"
+#include "log.h"
 #include "socket.h"
 #include "transport.h"
 
@@ -21,6 +22,7 @@ extern "C"
 
 a_Err_t a_Initialize(const a_Transport_PeerId_t id);
 void a_Deinitialize(void);
+void a_SetLogLevel(const a_Log_Level_t level);
 a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size);
 void a_Task(void);
 a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size);
