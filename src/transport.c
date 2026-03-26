@@ -400,7 +400,7 @@ size_t a_Transport_GetMessageKeySize(a_Transport_Message_t *const message)
     return key_size;
 }
 
-char *a_Transport_GetMessageKey(a_Transport_Message_t *const message)
+char *a_Transport_GetMessageKey(const a_Transport_Message_t *const message)
 {
     char *key = NULL;
 
@@ -434,7 +434,7 @@ a_Hash_t a_Transport_GetMessageKeyHash(a_Transport_Message_t *const message)
     return key_hash;
 }
 
-size_t a_Transport_GetMessageDataSize(a_Transport_Message_t *const message)
+size_t a_Transport_GetMessageDataSize(const a_Transport_Message_t *const message)
 {
     size_t data_size = SIZE_MAX;
 
@@ -446,7 +446,7 @@ size_t a_Transport_GetMessageDataSize(a_Transport_Message_t *const message)
     return data_size;
 }
 
-uint8_t *a_Transport_GetMessageData(a_Transport_Message_t *const message)
+uint8_t *a_Transport_GetMessageData(const a_Transport_Message_t *const message)
 {
     uint8_t *data = NULL;
 

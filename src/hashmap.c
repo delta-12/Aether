@@ -68,6 +68,7 @@ void a_Hashmap_Deinitialize(a_Hashmap_t *const hashmap)
             }
         }
 
+        a_free(hashmap->entries);
         hashmap->capacity = 0U;
         hashmap->size     = 0U;
     }

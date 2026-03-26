@@ -42,6 +42,7 @@ protected:
 
     void TearDown() override
     {
+        a_Deinitialize();
         delete mock_socket_;
     }
 

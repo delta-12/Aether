@@ -66,10 +66,10 @@ a_Transport_PeerId_t a_Transport_GetMessagePeerId(const a_Transport_Message_t *c
 a_Transport_SequenceNumber_t a_Transport_GetMessageSequenceNumber(const a_Transport_Message_t *const message);
 a_Tick_Ms_t a_Transport_GetMessageLease(a_Transport_Message_t *const message);
 size_t a_Transport_GetMessageKeySize(a_Transport_Message_t *const message);
-char *a_Transport_GetMessageKey(a_Transport_Message_t *const message);
+char *a_Transport_GetMessageKey(const a_Transport_Message_t *const message);
 a_Hash_t a_Transport_GetMessageKeyHash(a_Transport_Message_t *const message);
-size_t a_Transport_GetMessageDataSize(a_Transport_Message_t *const message);
-uint8_t *a_Transport_GetMessageData(a_Transport_Message_t *const message);
+size_t a_Transport_GetMessageDataSize(const a_Transport_Message_t *const message);
+uint8_t *a_Transport_GetMessageData(const a_Transport_Message_t *const message);
 
 #ifdef __cplusplus
 }
