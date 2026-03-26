@@ -89,6 +89,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE
             -Wall -Wextra -Werror -Wpedantic
+            -fPIC
             $<$<CONFIG:Debug>:-g --coverage>
             $<$<CONFIG:Debug>:
                 $<IF:$<BOOL:${AETHER_ENABLE_ASAN}>,-O1,-O0>
