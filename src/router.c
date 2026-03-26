@@ -31,18 +31,7 @@ typedef enum
 
 typedef struct
 {
-    a_Router_SessionId_t id;
-    a_Transport_Header_t header;
-    a_Transport_PeerId_t peer_id;
-    a_Transport_SequenceNumber_t sequence_number;
-    char *key;
-    uint8_t *data;
-} a_Router_Forwarder_t;
-
-typedef struct
-{
     a_Socket_t socket;
-    a_Hashmap_t keys;
     a_Router_SessionState_t state;
     size_t retries;
     a_Tick_Ms_t lease;
@@ -56,12 +45,13 @@ static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
+static a_Hashmap_t                  a_Router_Keys;
 // static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
-static void a_Router_SessionTaskCallback(void *key, void *value, const void *const arg);
+static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -80,11 +70,16 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 
     A_LOG_DEBUG(a_Router_LogTag, "Peer ID set to %d", a_Router_PeerId);
 
-    a_Err_t error = a_Hashmap_Initialize(&a_Router_Sessions, sizeof(a_Router_SessionId_t), sizeof(a_Router_Session_t));
+    a_Err_t error = a_Hashmap_Initialize(&a_Router_Sessions);
 
     if (A_ERR_NONE == error)
     {
-        error = a_Hashmap_Initialize(&a_Router_SequenceNumbers, sizeof(a_Transport_PeerId_t), sizeof(a_Transport_SequenceNumber_t));
+        error = a_Hashmap_Initialize(&a_Router_SequenceNumbers);
+    }
+
+    if (A_ERR_NONE == error)
+    {
+        error = a_Hashmap_Initialize(&a_Router_Keys);
     }
 
     if (A_ERR_NONE == error)
@@ -99,6 +94,7 @@ void a_Router_Deinitialize(void)
 {
     a_Hashmap_Deinitialize(&a_Router_Sessions);
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
+    a_Hashmap_Deinitialize(&a_Router_Keys);
     /* TODO deinitialize trie */
 }
 
@@ -115,21 +111,18 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
     {
         error = A_ERR_NULL;
     }
-    else if (NULL == a_Hashmap_Get(&a_Router_Sessions, &id))
+    else if (NULL == a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t)))
     {
         a_Router_Session_t session;
-        error = a_Hashmap_Insert(&a_Router_Sessions, &id, &session);
+        error = a_Hashmap_Insert(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t), &session, sizeof(a_Router_Session_t));
 
         if (A_ERR_NONE == error)
         {
-            a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id);
+            a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
 
-            /* TODO initialize session hashmap*/
-            /* TODO set maximum key string size */
             new_session->socket = *socket;
             new_session->state  = A_ROUTER_SESSION_STATE_CONNECT;
-
-            error = a_Transport_MessageInitialize(&new_session->message, buffer, size);
+            error               = a_Transport_MessageInitialize(&new_session->message, buffer, size);
 
             A_LOG_DEBUG(a_Router_LogTag, "Session %d added", id);
         }
@@ -141,7 +134,7 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 {
     a_Err_t                   error   = A_ERR_NONE;
-    a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id);
+    a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
 
     if (NULL != session)
     {
@@ -152,7 +145,7 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         // a_Hashmap_ForEach(&a_Router_Subscribers, a_Router_RemoveSubscriberCallback, &id); /* TODO remove any callbacks associated with session if applicable */
         if (A_ERR_NONE == error)
         {
-            error = a_Hashmap_Remove(&a_Router_Sessions, &id);
+            error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
         }
     }
 
@@ -166,6 +159,27 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
     }
 
     return error;
+}
+
+a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const size_t size)
+{
+    A_UNUSED(key);
+    A_UNUSED(data);
+    A_UNUSED(size);
+
+    /* TODO */
+
+    return A_ERR_NONE;
+}
+
+a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg))
+{
+    A_UNUSED(key);
+    A_UNUSED(callback);
+
+    /* TODO */
+
+    return A_ERR_NONE;
 }
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message)
@@ -201,7 +215,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 
         const a_Transport_PeerId_t                peer_id                 = a_Transport_GetMessagePeerId(&session->message);
         const a_Transport_SequenceNumber_t        sequence_number         = a_Transport_GetMessageSequenceNumber(&session->message);
-        const a_Transport_SequenceNumber_t *const current_sequence_number = a_Hashmap_Get(&a_Router_SequenceNumbers, &peer_id);
+        const a_Transport_SequenceNumber_t *const current_sequence_number = a_Hashmap_Get(&a_Router_SequenceNumbers, &peer_id, sizeof(a_Transport_PeerId_t));
 
         if (A_ERR_NONE != error)
         {
@@ -213,7 +227,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
         }
         else if ((NULL == current_sequence_number) || (sequence_number > *current_sequence_number))
         {
-            error = a_Hashmap_Insert(&a_Router_SequenceNumbers, &peer_id, &sequence_number);
+            error = a_Hashmap_Insert(&a_Router_SequenceNumbers, &peer_id, sizeof(a_Transport_PeerId_t), &sequence_number, sizeof(a_Transport_SequenceNumber_t));
         }
     }
 
@@ -225,9 +239,11 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
     return error;
 }
 
-static void a_Router_SessionTaskCallback(void *key, void *value, const void *const arg)
+static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
 {
     A_UNUSED(arg);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
 
     (void)a_Router_SessionTask(*(a_Router_SessionId_t *)key, value);
 }

@@ -6,13 +6,13 @@
 
 #include "err.h"
 
+typedef struct Hashmap_Entry a_Hashmap_Entry_t;
+
 typedef struct
 {
-    size_t key_size;
-    size_t value_size;
+    a_Hashmap_Entry_t **entries;
     size_t capacity;
     size_t size;
-    void **entries;
 } a_Hashmap_t;
 
 #ifdef __cplusplus
@@ -20,12 +20,18 @@ extern "C"
 {
 #endif /* __cplusplus */
 
-a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap, const size_t key_size, const size_t value_size);
+a_Err_t a_Hashmap_Initialize(a_Hashmap_t *const hashmap);
 void a_Hashmap_Deinitialize(a_Hashmap_t *const hashmap);
-a_Err_t a_Hashmap_Insert(a_Hashmap_t *const hashmap, const void *const key, const void *const value);
-void *a_Hashmap_Get(const a_Hashmap_t *const hashmap, const void *const key);
-a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key);
-void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap, void (*callback)(void *key, void *value, const void *const arg), const void *const arg);
+a_Err_t a_Hashmap_Insert(a_Hashmap_t *const hashmap, const void *const key, const size_t key_size, const void *const value, const size_t value_size);
+void *a_Hashmap_Get(const a_Hashmap_t *const hashmap, const void *const key, const size_t key_size);
+a_Err_t a_Hashmap_Remove(a_Hashmap_t *const hashmap, const void *const key, const size_t key_size);
+void a_Hashmap_ForEach(const a_Hashmap_t *const hashmap,
+                       void (*callback)(const void *const key,
+                                        const size_t key_size,
+                                        void *const value,
+                                        const size_t value_size,
+                                        const void *const arg),
+                       const void *const arg);
 
 #ifdef __cplusplus
 }
