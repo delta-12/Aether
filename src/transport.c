@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "buffer.h"
 #include "err.h"
@@ -10,6 +11,7 @@
 #include "tick.h"
 
 #define A_TRANSPORT_SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
+#define A_TRANSPORT_MAX_STRING_SIZE       (AETHER_TRANSPORT_MTU - (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t)))
 
 a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint8_t *const buffer, const size_t size)
 {
@@ -31,6 +33,20 @@ a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint
     }
 
     return error;
+}
+
+void a_Transport_MessageReset(a_Transport_Message_t *const message)
+{
+    if (NULL != message)
+    {
+        message->header          = A_TRANSPORT_HEADER_MAX;
+        message->peer_id         = A_TRANSPORT_PEER_ID_MAX;
+        message->sequence_number = A_TRANSPORT_SEQUENCE_NUMBER_MAX;
+        message->serialized      = false;
+        message->deserialized    = false;
+
+        (void)a_Buffer_Clear(&message->buffer);
+    }
 }
 
 a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a_Tick_Ms_t lease)
@@ -100,6 +116,49 @@ a_Err_t a_Transport_MessageRenew(a_Transport_Message_t *const message)
         (void)a_Buffer_Clear(&message->buffer);
 
         error = A_ERR_NONE;
+    }
+
+    return error;
+}
+
+a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const uint64_t key_hash, const uint8_t *const data, const size_t size)
+{
+    A_UNUSED(message);
+    A_UNUSED(key_hash);
+    A_UNUSED(data);
+    A_UNUSED(size);
+
+    /* TODO */
+
+    return A_ERR_MAX;
+}
+
+a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const char *const key)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if ((NULL != message) && (NULL != key))
+    {
+        const uint64_t key_size = (uint64_t)(strlen(key) + 1U);
+
+        if (key_size > A_TRANSPORT_MAX_STRING_SIZE)
+        {
+            error = A_ERR_SIZE;
+        }
+        else
+        {
+            message->header = A_TRANSPORT_HEADER_SUBSCRIBE;
+
+            (void)a_Buffer_Clear(&message->buffer);
+
+            size_t size = Leb128_Encode64(key_size, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+            (void)a_Buffer_SetWrite(&message->buffer, size);
+
+            memcpy(a_Buffer_GetWrite(&message->buffer), key, key_size);
+            (void)a_Buffer_SetWrite(&message->buffer, key_size);
+
+            error = A_ERR_NONE;
+        }
     }
 
     return error;
@@ -293,14 +352,36 @@ a_Tick_Ms_t a_Transport_GetMessageLease(a_Transport_Message_t *const message)
                 lease = A_TICK_MS_MAX;
             }
             break;
-        case A_TRANSPORT_HEADER_CLOSE:
-        case A_TRANSPORT_HEADER_RENEW:
-        case A_TRANSPORT_HEADER_SUBSCRIBE:
-        case A_TRANSPORT_HEADER_PUBLISH:
         default:
             break;
         }
     }
 
     return lease;
+}
+
+char *a_Transport_GetMessageKey(a_Transport_Message_t *const message)
+{
+    char *key = NULL;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
+    {
+        size_t       key_size = 0U;
+        const size_t size     = Leb128_Decode64(&key_size, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+
+        (void)a_Buffer_SetRead(&message->buffer, size);
+
+        key = (char *)a_Buffer_GetRead(&message->buffer);
+    }
+
+    return key;
+}
+
+a_Buffer_t *a_Transport_GetMessageData(a_Transport_Message_t *const message)
+{
+    A_UNUSED(message);
+
+    /* TODO */
+
+    return NULL;
 }

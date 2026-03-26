@@ -40,12 +40,19 @@ typedef struct
     a_Transport_Message_t message;
 } a_Router_Session_t;
 
+typedef struct
+{
+    void (*function)(const char *const key, const uint8_t *const data, const size_t size, void *arg);
+    void *arg;
+} a_Router_SubscriptionCallback_t;
+
 static const char *const            a_Router_LogTag         = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
 static a_Hashmap_t                  a_Router_Keys;
+static a_Hashmap_t                  a_Router_Subscriptions;
 // static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
@@ -56,6 +63,7 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 
 a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 {
@@ -84,6 +92,11 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 
     if (A_ERR_NONE == error)
     {
+        error = a_Hashmap_Initialize(&a_Router_Subscriptions);
+    }
+
+    if (A_ERR_NONE == error)
+    {
         /* TODO initialize trie */
     }
 
@@ -95,6 +108,7 @@ void a_Router_Deinitialize(void)
     a_Hashmap_Deinitialize(&a_Router_Sessions);
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
     a_Hashmap_Deinitialize(&a_Router_Keys);
+    a_Hashmap_Deinitialize(&a_Router_Subscriptions);
     /* TODO deinitialize trie */
 }
 
@@ -169,17 +183,26 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
 
     /* TODO */
 
-    return A_ERR_NONE;
+    return A_ERR_MAX;
 }
 
-a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg))
+a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg)
 {
-    A_UNUSED(key);
-    A_UNUSED(callback);
+    const a_Hash_t                        hash                  = a_Hash_Value(key, strlen(key) + 1U);
+    const a_Router_SubscriptionCallback_t subscription_callback = {
+        .function = callback,
+        .arg      = arg,
+    };
 
-    /* TODO */
+    a_Err_t error = a_Hashmap_Insert(&a_Router_Subscriptions, &hash, sizeof(hash), &subscription_callback, sizeof(subscription_callback));
 
-    return A_ERR_NONE;
+    if (A_ERR_NONE == error)
+    {
+        a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSubscribeCallback, key);
+        a_Router_SequenceNumber++;
+    }
+
+    return error;
 }
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message)
@@ -329,6 +352,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
             {
                 /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
+                /* TODO handle bad lease, i.e. A_TICK_MS_MAX */
                 a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
                 if (lease < session->lease)
                 {
@@ -423,4 +447,23 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     }
 
     return error;
+}
+
+static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    a_Router_Session_t *const session = value;
+
+    a_Transport_MessageReset(&session->message);
+    a_Transport_MessageSubscribe(&session->message, arg);
+    (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+
+    if (A_ERR_NONE != error)
+    {
+        A_LOG_ERROR(a_Router_LogTag, "Session %d sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+    }
 }

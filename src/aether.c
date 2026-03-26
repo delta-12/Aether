@@ -34,20 +34,18 @@ void a_Task(void)
     a_Router_Task();
 }
 
-a_Err_t a_Publish(void)
+a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size)
 {
-    /* TODO */
-    return A_ERR_NONE;
+    return a_Router_Publish(key, data, size);
 }
 
-a_Err_t a_Subscribe(void)
+a_Err_t a_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg)
 {
-    /* TODO */
-    return A_ERR_NONE;
+    return a_Router_Subscribe(key, callback, arg);
 }
 
 a_Err_t a_Query(void)
 {
     /* TODO */
-    return A_ERR_NONE;
+    return A_ERR_MAX;
 }

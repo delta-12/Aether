@@ -24,7 +24,7 @@ void a_Router_Task(void);
 a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket, uint8_t *const buffer, const size_t size);
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id);
 a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const size_t size);
-a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg));
+a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg);
 
 #ifdef __cplusplus
 }
