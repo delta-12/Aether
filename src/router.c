@@ -7,6 +7,7 @@
 #include "hash.h"
 #include "hashmap.h"
 #include "log.h"
+#include "memory.h"
 #include "random.h"
 #include "socket.h"
 #include "tick.h"
@@ -42,12 +43,6 @@ typedef struct
     a_Transport_Message_t message;
 } a_Router_Session_t;
 
-// typedef struct
-// {
-//     void (*function)(const char *const key, const uint8_t *const data, const size_t size, void *arg);
-//     void *arg;
-// } a_Router_SubscriptionCallback_t;
-
 struct a_Router_SubscriberSession
 {
     a_Router_SessionId_t id;
@@ -66,9 +61,7 @@ static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
-// static a_Hashmap_t                  a_Router_Keys;
-static a_Hashmap_t a_Router_Subscriptions;
-// static a_Hashmap_t                  a_Router_Subscribers; /* TODO replace with trie */
+static a_Hashmap_t                  a_Router_Subscriptions;
 
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -79,6 +72,8 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_RemoveSubscriberSessionsCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 
 a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 {
@@ -100,19 +95,9 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
         error = a_Hashmap_Initialize(&a_Router_SequenceNumbers);
     }
 
-    // if (A_ERR_NONE == error)
-    // {
-    //     error = a_Hashmap_Initialize(&a_Router_Keys);
-    // }
-
     if (A_ERR_NONE == error)
     {
         error = a_Hashmap_Initialize(&a_Router_Subscriptions);
-    }
-
-    if (A_ERR_NONE == error)
-    {
-        /* TODO initialize trie */
     }
 
     return error;
@@ -122,9 +107,8 @@ void a_Router_Deinitialize(void)
 {
     a_Hashmap_Deinitialize(&a_Router_Sessions);
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
-    // a_Hashmap_Deinitialize(&a_Router_Keys);
+    a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionsCallback, NULL);
     a_Hashmap_Deinitialize(&a_Router_Subscriptions);
-    /* TODO deinitialize trie */
 }
 
 void a_Router_Task(void)
@@ -171,9 +155,10 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         (void)a_Transport_MessageClose(&session->message);
         error = a_Router_SessionMessageSend(id, session);
 
-        /* TODO remove session from all subscriptions */
         if (A_ERR_NONE == error)
         {
+            a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
+
             error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
         }
     }
@@ -543,5 +528,52 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
     if (A_ERR_NONE != error)
     {
         A_LOG_ERROR(a_Router_LogTag, "Session %d sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+    }
+}
+
+static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    a_Router_Subscription_t *const    subscription       = value;
+    const a_Router_SessionId_t *const id                 = arg;
+    a_Router_SubscriberSession_t *    subscriber_session = subscription->sessions;
+    a_Router_SubscriberSession_t **   previous           = &subscription->sessions;
+
+    while (NULL != subscriber_session)
+    {
+        a_Router_SubscriberSession_t *const next = subscriber_session->next;
+
+        if (*id == subscriber_session->id)
+        {
+            *previous = subscriber_session->next;
+            a_free(subscriber_session);
+            break;
+        }
+
+        previous           = &subscriber_session->next;
+        subscriber_session = next;
+    }
+}
+
+static void a_Router_RemoveSubscriberSessionsCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+    A_UNUSED(arg);
+
+    a_Router_Subscription_t *const subscription       = value;
+    a_Router_SubscriberSession_t * subscriber_session = subscription->sessions;
+
+    while (NULL != subscriber_session)
+    {
+        a_Router_SubscriberSession_t *const next = subscriber_session->next;
+
+        a_free(subscriber_session);
+
+        subscriber_session = next;
     }
 }
