@@ -18,7 +18,7 @@ jobs:
       image: d3lta12/ubuntu-build-tools
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: "recursive"
       - name: Setup
@@ -38,7 +38,7 @@ jobs:
       image: d3lta12/ubuntu-build-tools
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: "recursive"
       - name: Setup
@@ -58,7 +58,7 @@ jobs:
       image: d3lta12/ubuntu-build-tools
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: "recursive"
       - name: Setup
@@ -83,7 +83,7 @@ jobs:
       checks: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: "recursive"
           fetch-depth: 0
