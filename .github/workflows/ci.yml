@@ -88,7 +88,7 @@ jobs:
           submodules: "recursive"
           fetch-depth: 0
       - name: Install Sonar Build Wrapper
-        uses: SonarSource/sonarqube-scan-action/install-build-wrapper@v6.0.0
+        uses: SonarSource/sonarqube-scan-action/install-build-wrapper@v7.0.0
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build tests
@@ -104,7 +104,7 @@ jobs:
       - name: Generate coverage report
         run: cmake --build build/debug -j$(nproc) -t sonarqube-coverage
       - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@v6.0.0
+        uses: SonarSource/sonarqube-scan-action@v7.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
