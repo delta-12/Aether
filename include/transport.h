@@ -27,8 +27,8 @@ typedef enum
     A_TRANSPORT_HEADER_ACCEPT,
     A_TRANSPORT_HEADER_CLOSE,
     A_TRANSPORT_HEADER_RENEW,
-    A_TRANSPORT_HEADER_SUBSCRIBE,
     A_TRANSPORT_HEADER_PUBLISH,
+    A_TRANSPORT_HEADER_SUBSCRIBE,
     A_TRANSPORT_HEADER_MAX
 } a_Transport_Header_t;
 
@@ -58,8 +58,10 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
 a_Err_t a_Transport_SerializeMessage(a_Transport_Message_t *const message, const a_Transport_PeerId_t peer_id, const a_Transport_SequenceNumber_t sequence_number);
 a_Err_t a_Transport_DeserializeMessage(a_Transport_Message_t *const message);
 a_Err_t a_Transport_CopyMessage(const a_Transport_Message_t *const message, a_Transport_Message_t *const copy);
+void a_Transport_CopyString(char *const copy, const char *const string, const size_t size);
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message);
 bool a_Transport_IsMessageDeserialized(const a_Transport_Message_t *const message);
+size_t a_Transport_GetStringSize(const char *const string);
 a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message);
 a_Transport_Header_t a_Transport_GetMessageHeader(const a_Transport_Message_t *const message);
 a_Transport_PeerId_t a_Transport_GetMessagePeerId(const a_Transport_Message_t *const message);

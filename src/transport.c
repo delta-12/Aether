@@ -158,7 +158,7 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
 
     if ((NULL != message) && (NULL != key))
     {
-        const uint64_t key_size = strnlen(key, A_TRANSPORT_MAX_STRING_SIZE) + 1U;
+        const uint64_t key_size = a_Transport_GetStringSize(key);
 
         if (key_size > A_TRANSPORT_MAX_STRING_SIZE)
         {
@@ -173,7 +173,7 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
             size_t size = Leb128_Encode64(key_size, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
             (void)a_Buffer_SetWrite(&message->buffer, size);
 
-            memcpy(a_Buffer_GetWrite(&message->buffer), key, key_size);
+            a_Transport_CopyString((char *)a_Buffer_GetWrite(&message->buffer), key, key_size);
             (void)a_Buffer_SetWrite(&message->buffer, key_size);
 
             error = A_ERR_NONE;
@@ -266,6 +266,15 @@ a_Err_t a_Transport_CopyMessage(const a_Transport_Message_t *const message, a_Tr
     return error;
 }
 
+void a_Transport_CopyString(char *const copy, const char *const string, const size_t size)
+{
+    if ((NULL != copy) && (NULL != string) && (size > 0U))
+    {
+        strncpy(copy, string, size);
+        *(copy + (size - 1U)) = '\0';
+    }
+}
+
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message)
 {
     bool serialized = false;
@@ -288,6 +297,18 @@ bool a_Transport_IsMessageDeserialized(const a_Transport_Message_t *const messag
     }
 
     return deserialized;
+}
+
+size_t a_Transport_GetStringSize(const char *const string)
+{
+    size_t size = 0U;
+
+    if (NULL != string)
+    {
+        size = strnlen(string, A_TRANSPORT_MAX_STRING_SIZE - 1U) + 1U;
+    }
+
+    return size;
 }
 
 a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message)

@@ -143,6 +143,20 @@ TEST(Transport, CopyMessage)
     /* TODO verify fields */
 }
 
+TEST(Transport, CopyString)
+{
+    const char *const string_0 = "foobar";
+    const char *const string_1 = "fooba";
+    char copy_0[strlen(string_0) + 1U] = {0};
+    char copy_1[strlen(string_1) + 1U] = {0};
+
+    a_Transport_CopyString(copy_0, string_0, strlen(string_0) + 1U);
+    ASSERT_STREQ(copy_0, string_0);
+
+    a_Transport_CopyString(copy_1, string_0, strlen(string_0));
+    ASSERT_STREQ(copy_1, string_1);
+}
+
 TEST(Transport, IsMessageSerialized)
 {
     a_Transport_Message_t message;
@@ -170,6 +184,12 @@ TEST(Transport, IsMessageDeserialized)
 
     a_Transport_DeserializeMessage(&message);
     ASSERT_TRUE(a_Transport_IsMessageDeserialized(&message));
+}
+
+TEST(Transport, GetStringSize)
+{
+    ASSERT_EQ(0U, a_Transport_GetStringSize(nullptr));
+    ASSERT_EQ(4U, a_Transport_GetStringSize("foo"));
 }
 
 TEST(Transport, GetMessageBuffer)
