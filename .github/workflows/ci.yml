@@ -27,7 +27,7 @@ jobs:
         run: cmake --build build/release -j$(nproc) -t Aether
       - name: Upload build
         if: ${{ success() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Aether-Release
           path: build/release/libAether.*
@@ -47,7 +47,7 @@ jobs:
         run: cmake --build build/debug -j$(nproc) -t cppcheck
       - name: Upload Cppcheck Report
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cppcheck-report
           path: build/debug/cppcheck_report.xml
@@ -67,7 +67,7 @@ jobs:
         run: cmake --build build/debug -j$(nproc) -t uncrustify-check
       - name: Upload Uncrustify Report
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: uncrustify-report
           path: build/debug/uncrustify_report.txt
@@ -97,7 +97,7 @@ jobs:
         run: ctest --test-dir build/debug --verbose
       - name: Upload unit tests log
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: unit-tests-log
           path: build/debug/Testing/Temporary/LastTest.log
