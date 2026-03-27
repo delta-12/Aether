@@ -9,6 +9,9 @@ on:
     branches:
       - "**"
   workflow_call:
+    secrets:
+      SONARCLOUD_TOKEN:
+        required: true
 
 jobs:
   build:
