@@ -36,7 +36,7 @@ jobs:
       - name: Create pre-release
         if: ${{ contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" \
+          gh release create "$tag" ./Aether-Release/* \
               --title="${tag#v}" \
               --generate-notes \
               --latest=false \
@@ -44,10 +44,7 @@ jobs:
       - name: Create release
         if: ${{ !contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" \
+          gh release create "$tag" ./Aether-Release/* \
               --title="${tag#v}" \
               --generate-notes \
               --latest=true
-      - name: Upload assets
-        run: |
-          gh release upload "$tag" ./Aether-Release/*
