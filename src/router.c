@@ -144,7 +144,7 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
             new_session->state  = A_ROUTER_SESSION_STATE_CONNECT;
             error               = a_Transport_MessageInitialize(&new_session->message, buffer, size);
 
-            A_LOG_DEBUG(a_Router_LogTag, "Session %d added", id);
+            A_LOG_DEBUG(a_Router_LogTag, "Session %#x added", id);
         }
     }
 
@@ -172,11 +172,11 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %d failed to delete with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
     }
     else
     {
-        A_LOG_DEBUG(a_Router_LogTag, "Session %d deleted", id);
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
     }
 
     return error;
@@ -219,7 +219,7 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
 
                 if (A_ERR_NONE != send_error)
                 {
-                    A_LOG_ERROR(a_Router_LogTag, "Session %d sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
+                    A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
                     error = send_error;
                 }
 
@@ -293,7 +293,7 @@ static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Rout
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %d sending message with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending message with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -330,7 +330,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %d receiving message with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x receiving message with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -361,11 +361,11 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
         error = a_Router_SessionOpen(id, session);
         break;
     case A_ROUTER_SESSION_STATE_CLOSED:
-        A_LOG_DEBUG(a_Router_LogTag, "Session %d closed", id);
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x closed", id);
         session->state = A_ROUTER_SESSION_STATE_CONNECT;
         break;
     case A_ROUTER_SESSION_STATE_FAILED:
-        A_LOG_DEBUG(a_Router_LogTag, "Session %d failed", id);
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x failed", id);
         session->state = A_ROUTER_SESSION_STATE_CONNECT;
         break;
     default:
@@ -390,13 +390,13 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
         session->lease               = AETHER_SESSION_LEASE;
         session->last_renew_received = a_Tick_GetTick();
 
-        A_LOG_DEBUG(a_Router_LogTag, "Session %d connecting", id);
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x connecting", id);
     }
     else
     {
         session->state = A_ROUTER_SESSION_STATE_FAILED;
 
-        A_LOG_WARNING(a_Router_LogTag, "Session %d failed connecting with error %s", id, a_Err_ToString(error));
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x failed connecting with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -448,7 +448,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
 
                 a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
-                A_LOG_DEBUG(a_Router_LogTag, "Session %d opened", id);
+                A_LOG_DEBUG(a_Router_LogTag, "Session %#x opened", id);
             }
             else
             {
@@ -460,14 +460,14 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
     {
         session->state = A_ROUTER_SESSION_STATE_CLOSED;
 
-        A_LOG_WARNING(a_Router_LogTag, "Session %d not opened", id);
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x not opened", id);
     }
 
     if (A_ERR_NONE != error)
     {
         session->state = A_ROUTER_SESSION_STATE_FAILED;
 
-        A_LOG_ERROR(a_Router_LogTag, "Session %d failed to open with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to open with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -481,7 +481,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     if (A_ERR_NONE != error)
     {
         /* Error receiving message */
-        A_LOG_WARNING(a_Router_LogTag, "Session %d failed to receive message with error %s", id, a_Err_ToString(error));
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x failed to receive message with error %s", id, a_Err_ToString(error));
     }
     else if (a_Transport_IsMessageDeserialized(&session->message))
     {
@@ -504,7 +504,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
         case A_TRANSPORT_HEADER_CONNECT:
         case A_TRANSPORT_HEADER_ACCEPT:
         default:
-            A_LOG_ERROR(a_Router_LogTag, "Session %d received invalid header", id);
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
             break;
         }
     }
@@ -514,7 +514,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
         session->state = A_ROUTER_SESSION_STATE_FAILED;
         error          = A_ERR_TIMEOUT;
 
-        A_LOG_ERROR(a_Router_LogTag, "Session %d timed out", id);
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x timed out", id);
     }
     else if (a_Tick_GetElapsed(session->last_renew_sent) > (session->lease / 2U))
     {
@@ -547,7 +547,7 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %d sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
     }
 }
 
@@ -637,7 +637,7 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
 
                 if (A_ERR_NONE != send_error)
                 {
-                    A_LOG_ERROR(a_Router_LogTag, "Session %d sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
+                    A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
                     error = send_error;
                 }
             }
@@ -680,7 +680,7 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
             }
             else
             {
-                A_LOG_ERROR(a_Router_LogTag, "Session %d failed to register subscription with error %s", id, a_Err_ToString(error));
+                A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to register subscription with error %s", id, a_Err_ToString(error));
             }
         }
         else
@@ -705,7 +705,7 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
     }
     else
     {
-        A_LOG_WARNING(a_Router_LogTag, "Session %d received invalid subscribe message", id);
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid subscribe message", id);
     }
 
     return error;
@@ -738,7 +738,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
 
         if (A_ERR_NONE != error)
         {
-            A_LOG_ERROR(a_Router_LogTag, "Session %d forwarding subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x forwarding subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
         }
     }
 }
@@ -769,7 +769,7 @@ static void a_Router_SessionSendSubscriptionsCallback(const void *const key, con
 
         if (A_ERR_NONE != error)
         {
-            A_LOG_ERROR(a_Router_LogTag, "Session %d sending initial subscribe message with error %s", subscription->key, a_Err_ToString(error));
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending initial subscribe message with error %s", subscription->key, a_Err_ToString(error));
         }
 
         (void)a_Router_SessionOpen(id, session);
