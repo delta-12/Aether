@@ -29,10 +29,10 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: aether-build
-          path: ./aether-build
+          name: Aether-Release
+          path: ./Aether-Release
       - name: Create pre-release
         if: ${{ contains(github.ref_name, '-') }}
         run: |
@@ -50,4 +50,4 @@ jobs:
               --latest=true
       - name: Upload assets
         run: |
-          gh release upload "$tag" ./aether-build/*
+          gh release upload "$tag" ./Aether-Release/*
