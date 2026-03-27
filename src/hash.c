@@ -23,7 +23,7 @@ a_Hash_t a_Hash_Value(const void *const value, const size_t size)
     return hash;
 }
 
-a_Hash_t a_Hash_String(const char *const string)
+a_Hash_t a_Hash_String(const char *const string, const size_t max_size)
 {
-    return a_Hash_Value(string, strlen(string));
+    return a_Hash_Value(string, strnlen(string, max_size));
 }

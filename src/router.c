@@ -194,7 +194,7 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
     }
     else
     {
-        const a_Hash_t                       hash         = a_Hash_String(key);
+        const a_Hash_t                       hash         = a_Hash_String(key, a_Transport_GetStringSize(key));
         const a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
         if (NULL != subscription)
@@ -242,7 +242,7 @@ a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *c
     else
     {
         const size_t             key_size     = a_Transport_GetStringSize(key);
-        const a_Hash_t           hash         = a_Hash_String(key);
+        const a_Hash_t           hash         = a_Hash_String(key, key_size);
         a_Router_Subscription_t *subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
         if (NULL == subscription)

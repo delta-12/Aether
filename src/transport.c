@@ -136,7 +136,7 @@ a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const c
     }
     else
     {
-        const uint64_t key_hash = a_Hash_String(key);
+        const uint64_t key_hash = a_Hash_String(key, A_TRANSPORT_MAX_STRING_SIZE);
 
         message->header = A_TRANSPORT_HEADER_PUBLISH;
 
@@ -270,7 +270,7 @@ void a_Transport_CopyString(char *const copy, const char *const string, const si
 {
     if ((NULL != copy) && (NULL != string) && (size > 0U))
     {
-        strncpy(copy, string, size);
+        memcpy(copy, string, size);
         *(copy + (size - 1U)) = '\0';
     }
 }

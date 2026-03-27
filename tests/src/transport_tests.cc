@@ -316,7 +316,7 @@ TEST(Transport, GetMessageKeyHash)
     a_Transport_MessagePublish(&message, key, data, sizeof(data));
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
-    ASSERT_EQ(a_Hash_String(key), a_Transport_GetMessageKeyHash(&message));
+    ASSERT_EQ(a_Hash_String(key, strlen(key)), a_Transport_GetMessageKeyHash(&message));
 }
 
 TEST(Transport, GetMessageDataSize)

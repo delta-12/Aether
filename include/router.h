@@ -5,10 +5,6 @@
 #include "socket.h"
 #include "transport.h"
 
-#ifndef AETHER_ROUTER_MAX_SESSIONS
-#define AETHER_ROUTER_MAX_SESSIONS 16U
-#endif /* AETHER_ROUTER_MAX_SESSIONS */
-
 typedef uint32_t a_Router_SessionId_t;
 
 #define A_TRANSPORT_SESSION_ID_MAX (a_Router_SessionId_t)(UINT64_MAX)

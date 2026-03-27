@@ -14,7 +14,7 @@ extern "C"
 #endif /* __cplusplus */
 
 a_Hash_t a_Hash_Value(const void *const value, const size_t size);
-a_Hash_t a_Hash_String(const char *const string);
+a_Hash_t a_Hash_String(const char *const string, const size_t max_size);
 
 #ifdef __cplusplus
 }
