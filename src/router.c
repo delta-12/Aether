@@ -77,6 +77,7 @@ static void a_Router_RemoveSubscriberSessionCallback(const void *const key, cons
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 
 /* TODO when removing sessions or callback (i.e. unsubscribing) from a a_Router_Subscription_t entry, remove the entry itself if both .sessions and .function are NULL */
 
@@ -600,17 +601,17 @@ static void a_Router_FreeSubscriptionCallback(const void *const key, const size_
 
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    a_Err_t                              error        = A_ERR_NONE;
-    const a_Hash_t                       hash         = a_Transport_GetMessageKeyHash(&session->message);
-    const a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
+    a_Err_t                              error           = A_ERR_NONE;
+    const a_Transport_PeerId_t           peer_id         = a_Transport_GetMessagePeerId(&session->message);
+    const a_Transport_SequenceNumber_t   sequence_number = a_Transport_GetMessageSequenceNumber(&session->message);
+    const a_Hash_t                       hash            = a_Transport_GetMessageKeyHash(&session->message);
+    const a_Router_Subscription_t *const subscription    = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
     if (NULL != subscription)
     {
-        const a_Transport_PeerId_t         peer_id            = a_Transport_GetMessagePeerId(&session->message);
-        const a_Transport_SequenceNumber_t sequence_number    = a_Transport_GetMessageSequenceNumber(&session->message);
-        const uint8_t *const               data               = a_Transport_GetMessageData(&session->message);
-        const size_t                       size               = a_Transport_GetMessageDataSize(&session->message);
-        a_Router_SubscriberSession_t *     subscriber_session = subscription->sessions;
+        const size_t                  size               = a_Transport_GetMessageDataSize(&session->message);
+        const uint8_t *const          data               = a_Transport_GetMessageData(&session->message);
+        a_Router_SubscriberSession_t *subscriber_session = subscription->sessions;
 
         if (NULL != subscription->function)
         {
@@ -649,11 +650,94 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
 
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    A_UNUSED(id);
-    A_UNUSED(session);
+    a_Err_t           error    = A_ERR_NONE;
+    const size_t      key_size = a_Transport_GetMessageKeySize(&session->message);
+    const char *const key      = a_Transport_GetMessageKey(&session->message);
 
-    /* TODO add session as subscriber to key, forward to all other sessions */
-    /* TODO add hash to keys lookup */
+    if ((key_size < SIZE_MAX) && (NULL != key))
+    {
+        const a_Hash_t                 hash         = a_Hash_String(key, key_size);
+        a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
-    return A_ERR_MAX;
+        if (NULL == subscription)
+        {
+            a_Router_Subscription_t new_subscription = {
+                .sessions = a_malloc(sizeof(a_Router_SubscriberSession_t)),
+                .function = NULL,
+                .arg      = NULL,
+                .key      = a_malloc(key_size),
+            };
+            new_subscription.sessions->id   = id;
+            new_subscription.sessions->next = NULL;
+            a_Transport_CopyString(new_subscription.key, key, key_size);
+
+            error = a_Hashmap_Insert(&a_Router_Subscriptions, &hash, sizeof(hash), &new_subscription, sizeof(new_subscription));
+
+            if (A_ERR_NONE == error)
+            {
+                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
+            }
+            else
+            {
+                A_LOG_ERROR(a_Router_LogTag, "Session %d failed to register subscription with error %s", id, a_Err_ToString(error));
+            }
+        }
+        else
+        {
+            const a_Router_SubscriberSession_t *subscriber_session = subscription->sessions;
+
+            while ((NULL != subscriber_session) && (id != subscriber_session->id))
+            {
+                subscriber_session = subscriber_session->next;
+            }
+
+            if (NULL == subscriber_session)
+            {
+                a_Router_SubscriberSession_t *const new_subscriber_session = a_malloc(sizeof(a_Router_SubscriberSession_t));
+                new_subscriber_session->id   = id;
+                new_subscriber_session->next = subscription->sessions;
+                subscription->sessions       = new_subscriber_session;
+
+                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
+            }
+        }
+    }
+    else
+    {
+        A_LOG_WARNING(a_Router_LogTag, "Session %d received invalid subscribe message", id);
+    }
+
+    return error;
+}
+
+static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    const a_Router_Session_t *const session_receive = (a_Router_Session_t *)arg;
+    a_Router_Session_t *const       session         = (a_Router_Session_t *)value;
+
+    if (session_receive != session)
+    {
+        const a_Transport_PeerId_t         peer_id         = a_Transport_GetMessagePeerId(&session_receive->message);
+        const a_Transport_SequenceNumber_t sequence_number = a_Transport_GetMessageSequenceNumber(&session_receive->message);
+        const char *const                  key_string      = a_Transport_GetMessageKey(&session_receive->message);
+
+        a_Transport_MessageReset(&session->message);
+
+        a_Err_t error = a_Transport_MessageSubscribe(&session->message, key_string);
+
+        if (A_ERR_NONE == error)
+        {
+            (void)a_Transport_SerializeMessage(&session->message, peer_id, sequence_number);
+
+            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %d forwarding subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        }
+    }
 }
