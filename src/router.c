@@ -78,6 +78,7 @@ static void a_Router_FreeSubscriptionCallback(const void *const key, const size_
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_SessionSendSubscriptionsCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 
 /* TODO when removing sessions or callback (i.e. unsubscribing) from a a_Router_Subscription_t entry, remove the entry itself if both .sessions and .function are NULL */
 
@@ -441,11 +442,11 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             {
                 /* TODO verify MTU matches */
 
-                /* TODO send all current subscriptions to session, make sure session is also receiving messages while sending */
-
                 session->last_renew_received = tick;
                 session->last_renew_sent     = tick;
                 session->state               = A_ROUTER_SESSION_STATE_OPEN;
+
+                a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
                 A_LOG_DEBUG(a_Router_LogTag, "Session %d opened", id);
             }
@@ -715,7 +716,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
     A_UNUSED(key_size);
     A_UNUSED(value_size);
 
-    const a_Router_Session_t *const session_receive = (a_Router_Session_t *)arg;
+    const a_Router_Session_t *const session_receive = (const a_Router_Session_t *)arg;
     a_Router_Session_t *const       session         = (a_Router_Session_t *)value;
 
     if (session_receive != session)
@@ -739,5 +740,38 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
         {
             A_LOG_ERROR(a_Router_LogTag, "Session %d forwarding subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
         }
+    }
+}
+
+static void a_Router_SessionSendSubscriptionsCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    const a_Router_Subscription_t *const subscription = (a_Router_Subscription_t *)value;
+
+    if ((NULL != subscription->function) || (NULL != subscription->sessions))
+    {
+        const a_Router_SessionId_t id      = *(const a_Router_SessionId_t *)arg;
+        a_Router_Session_t *const  session = a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(id));
+
+        a_Transport_MessageReset(&session->message);
+
+        a_Err_t error = a_Transport_MessageSubscribe(&session->message, subscription->key);
+
+        if (A_ERR_NONE == error)
+        {
+            a_Router_SerializeMessage(&session->message);
+
+            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %d sending initial subscribe message with error %s", subscription->key, a_Err_ToString(error));
+        }
+
+        (void)a_Router_SessionOpen(id, session);
     }
 }
