@@ -1,8 +1,6 @@
 #ifndef AETHER_LOG_H
 #define AETHER_LOG_H
 
-#include <stddef.h>
-
 typedef enum
 {
     A_LOG_LEVEL_ERROR,

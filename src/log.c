@@ -2,11 +2,10 @@
 
 #ifdef AETHER_LOG_ENABLED
 #include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
-#endif /* AETHER_LOG_ENABLED */
-
+#else
 #include "err.h"
+#endif /* AETHER_LOG_ENABLED */
 
 #ifdef AETHER_LOG_ENABLED
 #define A_LOG_ANSI_RESET  "\x1B[0m"
