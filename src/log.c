@@ -8,6 +8,7 @@
 
 #include "err.h"
 
+#ifdef AETHER_LOG_ENABLED
 #define A_LOG_ANSI_RESET  "\x1B[0m"
 #define A_LOG_ANSI_RED    "\x1B[0;31m"
 #define A_LOG_ANSI_YELLOW "\x1B[0;33m"
@@ -20,6 +21,11 @@
 #define A_LOG_LEVEL_TAG_INFO    "INFO"
 #define A_LOG_LEVEL_TAG_DEBUG   "DEBUG"
 #define A_LOG_LEVEL_TAG_VERBOSE "VERBOSE"
+
+#ifndef AETHER_LOG_LEVEL
+#define AETHER_LOG_LEVEL A_LOG_LEVEL_VERBOSE
+#endif /* AETHER_LOG_LEVEL */
+#endif /* AETHER_LOG_ENABLED */
 
 typedef enum
 {
@@ -47,8 +53,9 @@ static const char *a_Logger_LogTag[A_LOG_LEVEL_MAX] = {
 static const char *a_Logger_PrefixFormat  = "%s[%s] [%s] ";
 static const char *a_Logger_PostfixFormat = "%s\r\n";
 
+_Static_assert(((AETHER_LOG_LEVEL >= 0) && (AETHER_LOG_LEVEL < A_LOG_LEVEL_MAX)), "Invalid log level");
+static a_Log_Level_t a_Log_Level = AETHER_LOG_LEVEL;
 static a_Log_Mode_t  a_Log_Mode  = A_LOG_MODE_PRINT;
-static a_Log_Level_t a_Log_Level = A_LOG_LEVEL_VERBOSE;
 
 static void (*a_Log_CustomLog)(const char *const tag, const a_Log_Level_t level, const char *const format, ...) = NULL;   /* Client-specified logging function, not be called directly */
 #endif /* AETHER_LOG_ENABLED */
