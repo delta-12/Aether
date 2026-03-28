@@ -102,12 +102,12 @@ TEST_F(Aether, Task)
         testing::InSequence sequence;
 
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
-        for (std::size_t i = 0; i < sizeof(connect_message); i++)
+        for (std::size_t i = 0U; i < sizeof(connect_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message[i]), testing::Return(1U)));
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
-        for (std::size_t i = 0; i < sizeof(accept_message); i++)
+        for (std::size_t i = 0U; i < sizeof(accept_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(accept_message[i]), testing::Return(1U)));
         }

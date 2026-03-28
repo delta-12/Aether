@@ -45,6 +45,8 @@ TEST_F(Hashmap, Insert)
     value[0U] = 0x10U;
     ASSERT_EQ(A_ERR_NONE, a_Hashmap_Insert(&hashmap, &key, sizeof(key), value, sizeof(value)));
 
+    ASSERT_EQ(A_ERR_NONE, a_Hashmap_Insert(&hashmap, &key, sizeof(key), value, sizeof(value) - 1U));
+
     /* TODO test handling collisions and if table is full */
 }
 
@@ -72,6 +74,9 @@ TEST_F(Hashmap, Get)
     ASSERT_THAT(SPAN_FROM_VALUE(a_Hashmap_Get(&hashmap, &key_0, sizeof(key_0)), sizeof(value_0)), testing::ElementsAreArray(value_0));
     ASSERT_THAT(SPAN_FROM_VALUE(a_Hashmap_Get(&hashmap, &key_1, sizeof(key_1)), sizeof(value_1)), testing::ElementsAreArray(value_1));
 
+    a_Hashmap_Insert(&hashmap, &key_0, sizeof(key_0), value_0, sizeof(value_0) - 1U);
+    ASSERT_THAT(SPAN_FROM_VALUE(a_Hashmap_Get(&hashmap, &key_0, sizeof(key_0)), sizeof(value_0) - 1U), testing::ElementsAreArray(value_0, sizeof(value_0) - 1U));
+
     /* TODO */
 }
 
@@ -91,6 +96,18 @@ TEST_F(Hashmap, Remove)
     a_Hashmap_Insert(&hashmap, &key, sizeof(key), value, sizeof(value));
     ASSERT_EQ(A_ERR_NONE, a_Hashmap_Remove(&hashmap, &key, sizeof(key)));
     ASSERT_EQ(nullptr, a_Hashmap_Get(&hashmap, &key, sizeof(key)));
+
+    for (std::size_t i = 0U; i < 5; i++)
+    {
+        a_Hashmap_Insert(&hashmap, &key, sizeof(key), value, sizeof(value));
+        key++;
+    }
+    for (std::size_t i = 0U; i < 5; i++)
+    {
+        key--;
+        ASSERT_EQ(A_ERR_NONE, a_Hashmap_Remove(&hashmap, &key, sizeof(key)));
+        ASSERT_EQ(nullptr, a_Hashmap_Get(&hashmap, &key, sizeof(key)));
+    }
 
     /* TODO */
 }
