@@ -361,12 +361,14 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
         error = a_Router_SessionOpen(id, session);
         break;
     case A_ROUTER_SESSION_STATE_CLOSED:
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x closed", id);
+        a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
         session->state = A_ROUTER_SESSION_STATE_CONNECT;
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x closed", id);
         break;
     case A_ROUTER_SESSION_STATE_FAILED:
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x failed", id);
+        a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
         session->state = A_ROUTER_SESSION_STATE_CONNECT;
+        A_LOG_DEBUG(a_Router_LogTag, "Session %#x failed", id);
         break;
     default:
         session->state = A_ROUTER_SESSION_STATE_FAILED;
