@@ -27,13 +27,13 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build check
-        run: cmake --build build/release -j$(nproc) -t Aether
+        run: cmake --build --preset Release -j$(nproc) -t Aether
       - name: Upload build
         if: ${{ success() }}
         uses: actions/upload-artifact@v6
         with:
           name: Aether-Release
-          path: build/release/libAether.*
+          path: build/Release/libAether.*
   cppcheck:
     # if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -47,7 +47,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Cppcheck
-        run: cmake --build build/debug -j$(nproc) -t cppcheck
+        run: cmake --build --preset Debug -j$(nproc) -t cppcheck
       - name: Upload Cppcheck Report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
@@ -67,7 +67,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Crust check
-        run: cmake --build build/debug -j$(nproc) -t uncrustify-check
+        run: cmake --build --preset Debug -j$(nproc) -t uncrustify-check
       - name: Upload Uncrustify Report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
@@ -95,9 +95,9 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build tests
-        run: build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build build/debug -j$(nproc)
+        run: build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build --preset Debug -j$(nproc)
       - name: Execute tests
-        run: ctest --test-dir build/debug --verbose
+        run: ctest --test-dir build/Debug --verbose
       - name: Upload unit tests log
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
@@ -105,7 +105,7 @@ jobs:
           name: unit-tests-log
           path: build/debug/Testing/Temporary/LastTest.log
       - name: Generate coverage report
-        run: cmake --build build/debug -j$(nproc) -t sonarqube-coverage
+        run: cmake --build --preset Debug -j$(nproc) -t sonarqube-coverage
       - name: SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v7.0.0
         env:
