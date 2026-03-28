@@ -37,7 +37,9 @@ set(${PROJECT_NAME}_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/err_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hashmap_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/leb128_tests.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/log_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/random_tests.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/router_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serial_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tick_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/transport_tests.cc
@@ -48,14 +50,34 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         ${${PROJECT_NAME}_SRCS}
 )
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(${PROJECT_NAME}
+        PRIVATE
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address -fno-omit-frame-pointer -O1
+            >
+    )
+    target_link_options(${PROJECT_NAME}
+        PRIVATE
+            $<$<CONFIG:Debug>:--coverage>
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address
+            >
+    )
+# Add flags for other compilers here
+endif()
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
         Aether
         GTest::gtest_main
         GTest::gmock
 )
-target_link_options(${PROJECT_NAME}
-    PRIVATE
-        --coverage
-)
-gtest_discover_tests(${PROJECT_NAME})
+if(AETHER_ENABLE_ASAN)
+    gtest_discover_tests(${PROJECT_NAME}
+        DISCOVERY_MODE PRE_TEST
+        PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+    )
+else()
+    gtest_discover_tests(${PROJECT_NAME})
+endif()

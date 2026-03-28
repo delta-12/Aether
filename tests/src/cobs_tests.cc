@@ -155,7 +155,7 @@ TEST(Cobs, EncodeZeroEndMaxCodeRollover)
         data[i] = i + 2U;
         encoded[i + 1U] = i + 2U;
     }
-    data[sizeof(data)] = 0x00U;
+    data[sizeof(data) - 1U] = 0x00U;
     encoded[0U] = 0xFFU;
     encoded[sizeof(encoded) - 3U] = 0x01U;
     encoded[sizeof(encoded) - 2U] = 0x01U;
@@ -348,7 +348,7 @@ TEST(Cobs, DecodeZeroEndMaxCodeRollover)
         decoded[i] = i + 2U;
         buffer[i + 1U] = i + 2U;
     }
-    decoded[sizeof(decoded)] = 0x00U;
+    decoded[sizeof(decoded) - 1U] = 0x00U;
     buffer[0U] = 0xFFU;
     buffer[sizeof(buffer) - 3U] = 0x01U;
     buffer[sizeof(buffer) - 2U] = 0x01U;

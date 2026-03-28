@@ -29,6 +29,7 @@ size_t a_Buffer_GetWriteSize(const a_Buffer_t *const buffer);
 size_t a_Buffer_GetReadSize(const a_Buffer_t *const buffer);
 a_Err_t a_Buffer_AppendLeft(a_Buffer_t *const buffer, const a_Buffer_t *const appended);
 a_Err_t a_Buffer_AppendRight(a_Buffer_t *const buffer, const a_Buffer_t *const appended);
+a_Err_t a_Buffer_Copy(a_Buffer_t *const buffer, const a_Buffer_t *const copied);
 
 #ifdef __cplusplus
 }

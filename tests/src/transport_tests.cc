@@ -1,9 +1,14 @@
 #include <cstdint>
+#include <span>
 
 #include <gtest/gtest.h>
+#include <gmock/gmock-matchers.h>
 
 #include "err.h"
+#include "hash.h"
 #include "transport.h"
+
+#define SPAN_FROM_VALUE(value, size) std::span<std::uint8_t>(static_cast<std::uint8_t *>(value), size)
 
 TEST(Transport, MessageInitialize)
 {
@@ -62,6 +67,33 @@ TEST(Transport, MessageRenew)
     ASSERT_EQ(A_ERR_NONE, a_Transport_MessageRenew(&message));
 }
 
+TEST(Transport, MessagePublish)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    std::uint8_t data[] = {0x00U, 0x01, 0x02, 0x03};
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_ERR_NULL, a_Transport_MessagePublish(nullptr, "/foo/bar", data, sizeof(data)));
+    ASSERT_EQ(A_ERR_NULL, a_Transport_MessagePublish(&message, nullptr, data, sizeof(data)));
+    ASSERT_EQ(A_ERR_NULL, a_Transport_MessagePublish(&message, "/foo/bar", nullptr, sizeof(data)));
+
+    ASSERT_EQ(A_ERR_SIZE, a_Transport_MessagePublish(&message, "/foo/bar", data, 0U));
+
+    ASSERT_EQ(A_ERR_NONE, a_Transport_MessagePublish(&message, "/foo/bar", data, sizeof(data)));
+}
+
+TEST(Transport, MessageSubscribe)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_ERR_NULL, a_Transport_MessageSubscribe(nullptr, "/foo/bar"));
+
+    ASSERT_EQ(A_ERR_NONE, a_Transport_MessageSubscribe(&message, "/foo/bar"));
+}
+
 TEST(Transport, SerializeMessage)
 {
     a_Transport_Message_t message;
@@ -91,6 +123,40 @@ TEST(Transport, DeserializeMessage)
     /* TODO verify fields */
 }
 
+TEST(Transport, CopyMessage)
+{
+    a_Transport_Message_t message;
+    std::uint8_t message_buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_Message_t copy;
+    std::uint8_t copy_buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, message_buffer, sizeof(message_buffer));
+    a_Transport_MessageInitialize(&copy, copy_buffer, sizeof(copy_buffer));
+
+    ASSERT_EQ(A_ERR_NULL, a_Transport_CopyMessage(nullptr, &copy));
+    ASSERT_EQ(A_ERR_NULL, a_Transport_CopyMessage(&message, nullptr));
+
+    a_Transport_MessageConnect(&message, 1000U);
+    a_Transport_SerializeMessage(&message, 0x1234U, 0x5678U);
+    ASSERT_EQ(A_ERR_NONE, a_Transport_CopyMessage(&message, &copy));
+    ASSERT_EQ(A_ERR_NONE, a_Transport_DeserializeMessage(&copy));
+    /* TODO verify original message unchanged */
+    /* TODO verify fields */
+}
+
+TEST(Transport, CopyString)
+{
+    const char *const string_0 = "foobar";
+    const char *const string_1 = "fooba";
+    char copy_0[strlen(string_0) + 1U] = {0};
+    char copy_1[strlen(string_1) + 1U] = {0};
+
+    a_Transport_CopyString(copy_0, string_0, strlen(string_0) + 1U);
+    ASSERT_STREQ(copy_0, string_0);
+
+    a_Transport_CopyString(copy_1, string_0, strlen(string_0));
+    ASSERT_STREQ(copy_1, string_1);
+}
+
 TEST(Transport, IsMessageSerialized)
 {
     a_Transport_Message_t message;
@@ -118,6 +184,12 @@ TEST(Transport, IsMessageDeserialized)
 
     a_Transport_DeserializeMessage(&message);
     ASSERT_TRUE(a_Transport_IsMessageDeserialized(&message));
+}
+
+TEST(Transport, GetStringSize)
+{
+    ASSERT_EQ(0U, a_Transport_GetStringSize(nullptr));
+    ASSERT_EQ(4U, a_Transport_GetStringSize("foo"));
 }
 
 TEST(Transport, GetMessageBuffer)
@@ -195,4 +267,91 @@ TEST(Transport, GetMessageLease)
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
     ASSERT_EQ(5000U, a_Transport_GetMessageLease(&message));
+}
+
+TEST(Transport, GetMessageKeySize)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    const char *const key = "/foo/bar";
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(SIZE_MAX, a_Transport_GetMessageKeySize(nullptr));
+    ASSERT_EQ(SIZE_MAX, a_Transport_GetMessageKeySize(&message));
+
+    a_Transport_MessageSubscribe(&message, key);
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    ASSERT_EQ(strlen(key) + 1U, a_Transport_GetMessageKeySize(&message));
+}
+
+TEST(Transport, GetMessageKey)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    const char *const key = "/foo/bar";
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(nullptr, a_Transport_GetMessageKey(nullptr));
+    ASSERT_EQ(nullptr, a_Transport_GetMessageKey(&message));
+
+    a_Transport_MessageSubscribe(&message, key);
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    a_Transport_GetMessageKeySize(&message);
+    ASSERT_STREQ(key, a_Transport_GetMessageKey(&message));
+}
+
+TEST(Transport, GetMessageKeyHash)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    const char *const key = "/foo/bar";
+    std::uint8_t data[] = {0x00U, 0x01, 0x02, 0x03};
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_HASH_MAX, a_Transport_GetMessageKeyHash(nullptr));
+    ASSERT_EQ(A_HASH_MAX, a_Transport_GetMessageKeyHash(&message));
+
+    a_Transport_MessagePublish(&message, key, data, sizeof(data));
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    ASSERT_EQ(a_Hash_String(key, strlen(key)), a_Transport_GetMessageKeyHash(&message));
+}
+
+TEST(Transport, GetMessageDataSize)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    const char *const key = "/foo/bar";
+    std::uint8_t data[] = {0x00U, 0x01, 0x02, 0x03};
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(SIZE_MAX, a_Transport_GetMessageDataSize(nullptr));
+    ASSERT_EQ(SIZE_MAX, a_Transport_GetMessageDataSize(&message));
+
+    a_Transport_MessagePublish(&message, key, data, sizeof(data));
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    a_Transport_GetMessageKeyHash(&message);
+    ASSERT_EQ(sizeof(data), a_Transport_GetMessageDataSize(&message));
+}
+
+TEST(Transport, GetMessageData)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    const char *const key = "/foo/bar";
+    std::uint8_t data[] = {0x00U, 0x01, 0x02, 0x03};
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(nullptr, a_Transport_GetMessageData(nullptr));
+    ASSERT_EQ(nullptr, a_Transport_GetMessageData(&message));
+
+    a_Transport_MessagePublish(&message, key, data, sizeof(data));
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    a_Transport_GetMessageKeyHash(&message);
+    a_Transport_GetMessageDataSize(&message);
+    ASSERT_THAT(SPAN_FROM_VALUE(a_Transport_GetMessageData(&message), sizeof(data)), testing::ElementsAreArray(data));
 }

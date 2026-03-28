@@ -2,6 +2,12 @@
 _build
 build
 
+# CMake
+CMakeUserPresets.json
+
+# Test code
+_*
+
 # Version header
 include/version.h
 

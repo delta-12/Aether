@@ -5,10 +5,6 @@
 #include "socket.h"
 #include "transport.h"
 
-#ifndef AETHER_ROUTER_MAX_SESSIONS
-#define AETHER_ROUTER_MAX_SESSIONS 16U
-#endif /* AETHER_ROUTER_MAX_SESSIONS */
-
 typedef uint32_t a_Router_SessionId_t;
 
 #define A_TRANSPORT_SESSION_ID_MAX (a_Router_SessionId_t)(UINT64_MAX)
@@ -19,10 +15,12 @@ extern "C"
 #endif /* __cplusplus */
 
 a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id);
-a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket);
+void a_Router_Deinitialize(void);
+void a_Router_Task(void);
+a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket, uint8_t *const buffer, const size_t size);
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id);
-a_Err_t a_Router_SessionMessageGet(const a_Router_SessionId_t id, a_Transport_Message_t *const message);
-a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Transport_Message_t *const message);
+a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const size_t size);
+a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg);
 
 #ifdef __cplusplus
 }

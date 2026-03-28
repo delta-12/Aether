@@ -3,13 +3,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "buffer.h"
 #include "err.h"
+#include "hash.h"
 #include "leb128.h"
 #include "tick.h"
 
 #define A_TRANSPORT_SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
+#define A_TRANSPORT_MAX_STRING_SIZE       (AETHER_TRANSPORT_MTU - (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t)))
 
 a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint8_t *const buffer, const size_t size)
 {
@@ -31,6 +34,20 @@ a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint
     }
 
     return error;
+}
+
+void a_Transport_MessageReset(a_Transport_Message_t *const message)
+{
+    if (NULL != message)
+    {
+        message->header          = A_TRANSPORT_HEADER_MAX;
+        message->peer_id         = A_TRANSPORT_PEER_ID_MAX;
+        message->sequence_number = A_TRANSPORT_SEQUENCE_NUMBER_MAX;
+        message->serialized      = false;
+        message->deserialized    = false;
+
+        (void)a_Buffer_Clear(&message->buffer);
+    }
 }
 
 a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a_Tick_Ms_t lease)
@@ -105,6 +122,67 @@ a_Err_t a_Transport_MessageRenew(a_Transport_Message_t *const message)
     return error;
 }
 
+a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const char *const key, const uint8_t *const data, const size_t data_size)
+{
+    a_Err_t error = A_ERR_NONE;
+
+    if ((NULL == message) || (NULL == key) || (NULL == data))
+    {
+        error = A_ERR_NULL;
+    }
+    else if ((0U == data_size) || (data_size > A_TRANSPORT_MAX_STRING_SIZE))
+    {
+        error = A_ERR_SIZE;
+    }
+    else
+    {
+        const uint64_t key_hash = a_Hash_String(key, A_TRANSPORT_MAX_STRING_SIZE);
+
+        message->header = A_TRANSPORT_HEADER_PUBLISH;
+
+        (void)a_Buffer_Clear(&message->buffer);
+
+        size_t size = Leb128_Encode64(key_hash, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        (void)a_Buffer_SetWrite(&message->buffer, size);
+
+        memcpy(a_Buffer_GetWrite(&message->buffer), data, data_size);
+        (void)a_Buffer_SetWrite(&message->buffer, data_size);
+    }
+
+    return error;
+}
+
+a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const char *const key)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if ((NULL != message) && (NULL != key))
+    {
+        const uint64_t key_size = a_Transport_GetStringSize(key);
+
+        if (key_size > A_TRANSPORT_MAX_STRING_SIZE)
+        {
+            error = A_ERR_SIZE;
+        }
+        else
+        {
+            message->header = A_TRANSPORT_HEADER_SUBSCRIBE;
+
+            (void)a_Buffer_Clear(&message->buffer);
+
+            size_t size = Leb128_Encode64(key_size, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+            (void)a_Buffer_SetWrite(&message->buffer, size);
+
+            a_Transport_CopyString((char *)a_Buffer_GetWrite(&message->buffer), key, key_size);
+            (void)a_Buffer_SetWrite(&message->buffer, key_size);
+
+            error = A_ERR_NONE;
+        }
+    }
+
+    return error;
+}
+
 a_Err_t a_Transport_SerializeMessage(a_Transport_Message_t *const message, const a_Transport_PeerId_t peer_id, const a_Transport_SequenceNumber_t sequence_number)
 {
     a_Err_t error = A_ERR_NULL;
@@ -170,6 +248,33 @@ a_Err_t a_Transport_DeserializeMessage(a_Transport_Message_t *const message)
     return error;
 }
 
+a_Err_t a_Transport_CopyMessage(const a_Transport_Message_t *const message, a_Transport_Message_t *const copy)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if ((NULL != message) && (NULL != copy))
+    {
+        copy->header          = message->header;
+        copy->peer_id         = message->peer_id;
+        copy->sequence_number = message->sequence_number;
+        copy->serialized      = message->serialized;
+        copy->deserialized    = message->deserialized;
+
+        error = a_Buffer_Copy(&copy->buffer, &message->buffer);
+    }
+
+    return error;
+}
+
+void a_Transport_CopyString(char *const copy, const char *const string, const size_t size)
+{
+    if ((NULL != copy) && (NULL != string) && (size > 0U))
+    {
+        memcpy(copy, string, size);
+        *(copy + (size - 1U)) = '\0';
+    }
+}
+
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message)
 {
     bool serialized = false;
@@ -192,6 +297,18 @@ bool a_Transport_IsMessageDeserialized(const a_Transport_Message_t *const messag
     }
 
     return deserialized;
+}
+
+size_t a_Transport_GetStringSize(const char *const string)
+{
+    size_t size = 0U;
+
+    if (NULL != string)
+    {
+        size = strnlen(string, A_TRANSPORT_MAX_STRING_SIZE - 1U) + 1U;
+    }
+
+    return size;
 }
 
 a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message)
@@ -275,14 +392,89 @@ a_Tick_Ms_t a_Transport_GetMessageLease(a_Transport_Message_t *const message)
                 lease = A_TICK_MS_MAX;
             }
             break;
-        case A_TRANSPORT_HEADER_CLOSE:
-        case A_TRANSPORT_HEADER_RENEW:
-        case A_TRANSPORT_HEADER_SUBSCRIBE:
-        case A_TRANSPORT_HEADER_PUBLISH:
         default:
             break;
         }
     }
 
     return lease;
+}
+
+size_t a_Transport_GetMessageKeySize(a_Transport_Message_t *const message)
+{
+    size_t key_size = SIZE_MAX;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
+    {
+        const size_t size = Leb128_Decode64(&key_size, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+
+        if (SIZE_MAX != size)
+        {
+            (void)a_Buffer_SetRead(&message->buffer, size);
+        }
+        else
+        {
+            key_size = SIZE_MAX;
+        }
+    }
+
+    return key_size;
+}
+
+char *a_Transport_GetMessageKey(const a_Transport_Message_t *const message)
+{
+    char *key = NULL;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
+    {
+        /* TODO return NULL if string is not valid, i.e. not null terminated */
+        key = (char *)a_Buffer_GetRead(&message->buffer);
+    }
+
+    return key;
+}
+
+a_Hash_t a_Transport_GetMessageKeyHash(a_Transport_Message_t *const message)
+{
+    a_Hash_t key_hash = A_HASH_MAX;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        const size_t size = Leb128_Decode64(&key_hash, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+
+        if (SIZE_MAX != size)
+        {
+            (void)a_Buffer_SetRead(&message->buffer, size);
+        }
+        else
+        {
+            key_hash = A_HASH_MAX;
+        }
+    }
+
+    return key_hash;
+}
+
+size_t a_Transport_GetMessageDataSize(const a_Transport_Message_t *const message)
+{
+    size_t data_size = SIZE_MAX;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        data_size = a_Buffer_GetReadSize(&message->buffer);
+    }
+
+    return data_size;
+}
+
+uint8_t *a_Transport_GetMessageData(const a_Transport_Message_t *const message)
+{
+    uint8_t *data = NULL;
+
+    if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
+    {
+        data = a_Buffer_GetRead(&message->buffer);
+    }
+
+    return data;
 }

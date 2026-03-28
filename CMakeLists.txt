@@ -13,6 +13,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 option(AETHER_BUILD_TESTS "Build Aether tests" OFF)
+option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
 
 ################################################################################
 # Versioning
@@ -57,12 +58,14 @@ set(SRCS
     ${SRC_DIR}/buffer.c
     ${SRC_DIR}/cobs.c
     ${SRC_DIR}/err.c
+    ${SRC_DIR}/hash.c
     ${SRC_DIR}/hashmap.c
     ${SRC_DIR}/leb128.c
+    ${SRC_DIR}/log.c
+    ${SRC_DIR}/memory.c
     ${SRC_DIR}/random.c
     ${SRC_DIR}/router.c
     ${SRC_DIR}/serial.c
-    ${SRC_DIR}/session.c
     ${SRC_DIR}/socket.c
     ${SRC_DIR}/tick.c
     ${SRC_DIR}/transport.c
@@ -82,15 +85,36 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC
         ${INCLUDE_DIR}
 )
+target_compile_definitions(${PROJECT_NAME}
+    PRIVATE
+        $<$<BOOL:${AETHER_LOG_ENABLED}>:AETHER_LOG_ENABLED>
+        $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR}>:AETHER_MEMORY_STATIC_ALLOCATOR>
+        $<$<BOOL:${AETHER_TICK_USER}>:AETHER_TICK_USER>
+        $<$<BOOL:${AETHER_LOG_LEVEL}>:AETHER_LOG_LEVEL=${AETHER_LOG_LEVEL}>
+        $<$<BOOL:${AETHER_TRANSPORT_MTU}>:AETHER_TRANSPORT_MTU=${AETHER_TRANSPORT_MTU}>
+        $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR_SIZE}>:AETHER_MEMORY_STATIC_ALLOCATOR_SIZE=${AETHER_MEMORY_STATIC_ALLOCATOR_SIZE}>
+        $<$<BOOL:${AETHER_SESSION_RETRIES}>:AETHER_SESSION_RETRIES=${AETHER_SESSION_RETRIES}>
+        $<$<BOOL:${AETHER_SESSION_LEASE}>:AETHER_SESSION_LEASE=${AETHER_SESSION_LEASE}>
+)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE
             -Wall -Wextra -Werror -Wpedantic
-            $<$<CONFIG:Debug>:-g -O0 --coverage>
+            -fPIC
+            $<$<CONFIG:Debug>:-g --coverage>
+            $<$<CONFIG:Debug>:
+                $<IF:$<BOOL:${AETHER_ENABLE_ASAN}>,-O1,-O0>
+            >
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address -fno-omit-frame-pointer
+            >
     )
     target_link_options(${PROJECT_NAME}
         PRIVATE
             $<$<CONFIG:Debug>:--coverage>
+            $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
+                -fsanitize=address
+            >
     )
 # Add flags for other compilers here
 endif()

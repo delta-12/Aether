@@ -14,12 +14,16 @@
         <id>unusedFunction</id>
     </suppress>
 
-    <!-- Suppress variable can be declared as pointer to const false positive -->
+    <!-- Suppress static linkage for functions to be used outside of translation unit -->
     <suppress>
-        <id>constVariablePointer</id>
-        <fileName>*/src/hashmap.c</fileName>
-        <lineNumber>123</lineNumber>
-        <symbolName>value</symbolName>
+        <id>staticFunction</id>
+        <symbolName>a_Buffer_AppendRight</symbolName>
+    </suppress>
+
+    <!-- Suppress parameter can be declared as pointer to const -->
+    <suppress>
+        <id>constParameterPointer</id>
+        <fileName>*/src/memory.c</fileName>
     </suppress>
 
 </suppressions>

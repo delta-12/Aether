@@ -9,6 +9,9 @@ on:
     branches:
       - "**"
   workflow_call:
+    secrets:
+      SONARCLOUD_TOKEN:
+        required: true
 
 jobs:
   build:
@@ -24,13 +27,13 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build check
-        run: cmake --build build/release -j$(nproc) -t Aether
+        run: cmake --build --preset Release -j$(nproc) -t Aether
       - name: Upload build
         if: ${{ success() }}
         uses: actions/upload-artifact@v6
         with:
           name: Aether-Release
-          path: build/release/libAether.*
+          path: build/Release/libAether.*
   cppcheck:
     # if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -44,13 +47,13 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Cppcheck
-        run: cmake --build build/debug -j$(nproc) -t cppcheck
+        run: cmake --build --preset Debug -j$(nproc) -t cppcheck
       - name: Upload Cppcheck Report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
         with:
           name: cppcheck-report
-          path: build/debug/cppcheck_report.xml
+          path: build/Debug/cppcheck_report.xml
   uncrustify:
     # if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -64,13 +67,13 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Crust check
-        run: cmake --build build/debug -j$(nproc) -t uncrustify-check
+        run: cmake --build --preset Debug -j$(nproc) -t uncrustify-check
       - name: Upload Uncrustify Report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
         with:
           name: uncrustify-report
-          path: build/debug/uncrustify_report.txt
+          path: build/Debug/uncrustify_report.txt
   unit-tests:
     runs-on: ubuntu-latest
     container:
@@ -92,17 +95,17 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build tests
-        run: build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build build/debug -j$(nproc)
+        run: build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build --preset Debug -j$(nproc)
       - name: Execute tests
-        run: ctest --test-dir build/debug --verbose
+        run: ctest --test-dir build/Debug --verbose
       - name: Upload unit tests log
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
         with:
           name: unit-tests-log
-          path: build/debug/Testing/Temporary/LastTest.log
+          path: build/Debug/Testing/Temporary/LastTest.log
       - name: Generate coverage report
-        run: cmake --build build/debug -j$(nproc) -t sonarqube-coverage
+        run: cmake --build --preset Debug -j$(nproc) -t sonarqube-coverage
       - name: SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v7.0.0
         env:
@@ -118,4 +121,5 @@ jobs:
             -Dsonar.pullrequest.branch=${{ github.head_ref }}
             -Dsonar.pullrequest.base=${{ github.base_ref }}
             --define sonar.cfamily.compile-commands=${{ env.BUILD_WRAPPER_OUT_DIR }}/compile_commands.json
-            --define sonar.coverageReportPaths=build/debug/coverage.xml
+            --define sonar.coverageReportPaths=build/Debug/coverage.xml
+            ${{ github.ref_type == 'tag' && format('-Dsonar.branch.name={0}', github.ref_name) || '' }}
