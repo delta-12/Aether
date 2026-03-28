@@ -436,7 +436,7 @@ char *a_Transport_GetMessageKey(const a_Transport_Message_t *const message)
 
 a_Hash_t a_Transport_GetMessageKeyHash(a_Transport_Message_t *const message)
 {
-    size_t key_hash = A_HASH_MAX;
+    a_Hash_t key_hash = A_HASH_MAX;
 
     if ((NULL != message) && (A_TRANSPORT_HEADER_PUBLISH == message->header))
     {

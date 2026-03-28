@@ -1,12 +1,12 @@
 #ifndef AETHER_HASH_H
 #define AETHER_HASH_H
 
-#include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#define A_HASH_MAX ULONG_MAX
+#define A_HASH_MAX UINT64_MAX
 
-typedef unsigned long a_Hash_t;
+typedef uint64_t a_Hash_t;
 
 #ifdef __cplusplus
 extern "C"
