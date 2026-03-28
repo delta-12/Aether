@@ -50,9 +50,6 @@ static const char *a_Logger_LogTag[A_LOG_LEVEL_MAX] = {
     [A_LOG_LEVEL_VERBOSE] = A_LOG_LEVEL_TAG_VERBOSE,
 };
 
-static const char *a_Logger_PrefixFormat  = "%s[%s] [%s] ";
-static const char *a_Logger_PostfixFormat = "%s\r\n";
-
 _Static_assert(((AETHER_LOG_LEVEL >= 0) && (AETHER_LOG_LEVEL < A_LOG_LEVEL_MAX)), "Invalid log level");
 static a_Log_Level_t a_Log_Level = AETHER_LOG_LEVEL;
 static a_Log_Mode_t  a_Log_Mode  = A_LOG_MODE_PRINT;
@@ -122,8 +119,8 @@ void a_Log(const char *const tag, const a_Log_Level_t level, const char *const f
 #ifdef AETHER_LOG_ENABLED
 static void a_Log_Print(const char *const tag, const a_Log_Level_t level, const char *const format, va_list args)
 {
-    printf(a_Logger_PrefixFormat, a_Logger_AnsiColor[level], a_Logger_LogTag[level], tag);
+    printf("%s[%s] [%s] ", a_Logger_AnsiColor[level], a_Logger_LogTag[level], tag);
     vprintf(format, args);
-    printf(a_Logger_PostfixFormat, A_LOG_ANSI_RESET);
+    printf("%s\r\n", A_LOG_ANSI_RESET);
 }
 #endif /* AETHER_LOG_ENABLED */
