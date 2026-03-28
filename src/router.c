@@ -534,20 +534,23 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
 
     a_Router_Session_t *const session = value;
 
-    a_Transport_MessageReset(&session->message);
-
-    a_Err_t error = a_Transport_MessageSubscribe(&session->message, arg);
-
-    if (A_ERR_NONE == error)
+    if (A_ROUTER_SESSION_STATE_OPEN == session->state)
     {
-        (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+        a_Transport_MessageReset(&session->message);
 
-        error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
-    }
+        a_Err_t error = a_Transport_MessageSubscribe(&session->message, arg);
 
-    if (A_ERR_NONE != error)
-    {
-        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        if (A_ERR_NONE == error)
+        {
+            (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        }
     }
 }
 
