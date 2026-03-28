@@ -6,6 +6,7 @@
 #include "aether.h"
 
 #define SERIAL_TEST_BUFFER_SIZE 256U
+// #define SPAN_FROM_VALUE(value, size) std::span<std::uint8_t>(static_cast<std::uint8_t *>(value), size)
 
 class Socket
 {
@@ -97,8 +98,9 @@ TEST_F(Aether, Task)
     std::uint8_t accept_message[] = {0x09U, 0x01U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x01U, 0xF4U, 0x03U, 0x00U};
     std::uint8_t renew_message[] = {0x07U, 0x03U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x02U, 0x00U};
     std::uint8_t subscribe_message[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x03U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
+    std::uint8_t publish_message[] = {0x10U, 0x04U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x04U, 0xF8U, 0xABU, 0xE2U, 0xE3U, 0x17U, 0x01U, 0x02U, 0x03U, 0x04U, 0x00U};
+    std::uint8_t close_message[] = {0x07U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x05U, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
-    std::uint8_t close_message[] = {0x07U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x04U, 0x00U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
     a_AddSocket(&socket_, A_MODE_CONNECT, message_buffer_, sizeof(message_buffer_));
 
@@ -128,6 +130,11 @@ TEST_F(Aether, Task)
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message[i]), testing::Return(1U)));
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
+        for (std::size_t i = 0U; i < sizeof(publish_message); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(publish_message[i]), testing::Return(1U)));
+        }
+        EXPECT_CALL(*mock_subscriber_, Callback(testing::StrEq("/foo"), testing::_, testing::_, nullptr)).With(testing::Args<1, 2>(testing::ElementsAreArray(data, sizeof(data)))).Times(1);
         for (std::size_t i = 0U; i < sizeof(close_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
@@ -148,6 +155,7 @@ TEST_F(Aether, Task)
 
     ASSERT_EQ(A_ERR_NONE, a_Publish("/baz", data, sizeof(data)));
 
+    a_Task(); // Receive publish
     a_Task(); // Receive close
     a_Task(); // Close session
 }
