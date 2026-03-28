@@ -95,6 +95,9 @@ TEST_F(Aether, Task)
     /* TODO ensure random peer ID, current peer id = 12345678U */
     std::uint8_t connect_message[] = {0x01U, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x03U, 0xE8U, 0x07U, 0x00U};
     std::uint8_t accept_message[] = {0x09U, 0x01U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x01U, 0xF4U, 0x03U, 0x00U};
+    std::uint8_t renew_message[] = {0x07U, 0x03U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x02U, 0x00U};
+    std::uint8_t subscribe_message[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x03U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
+    std::uint8_t close_message[] = {0x07U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x04U, 0x00U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
     a_AddSocket(&socket_, A_MODE_CONNECT, message_buffer_, sizeof(message_buffer_));
 
@@ -114,15 +117,37 @@ TEST_F(Aether, Task)
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::Return(0U));
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::Return(0U));
+        for (std::size_t i = 0U; i < sizeof(renew_message); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(renew_message[i]), testing::Return(1U)));
+        }
+        for (std::size_t i = 0U; i < sizeof(subscribe_message); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message[i]), testing::Return(1U)));
+        }
+        for (std::size_t i = 0U; i < sizeof(close_message); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
+        }
     }
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/foo", Callback, nullptr));
 
-    a_Task();
-    a_Task();
-    a_Task();
+    a_Task(); // Send connect
+    a_Task(); // Receive connect
+    a_Task(); // Send accept
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/bar", Callback, nullptr));
+
+    a_Task(); // Do nothing
+    a_Task(); // Receive renew
+    a_Task(); // Receive subscribe
+
+    // TODO Publish
+
+    a_Task(); // Receive close
+    a_Task(); // Close session
 }
 
 TEST_F(Aether, Publish)
