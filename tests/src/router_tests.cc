@@ -57,15 +57,13 @@ protected:
 
 MockSocket *Router::mock_socket_ = nullptr;
 
-TEST_F(Router, SessoinDelete)
+TEST_F(Router, SessionDelete)
 {
     a_Router_SessionId_t id = 12345678U;
-    std::uint8_t buffer[16U];
     a_Router_Initialize(A_TRANSPORT_PEER_ID_MAX);
+    a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_));
 
     EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
-
-    a_Router_SessionAdd(id, &socket_, buffer, sizeof(buffer));
     ASSERT_EQ(A_ERR_NONE, a_Router_SessionDelete(id));
 
     /* TODO */
