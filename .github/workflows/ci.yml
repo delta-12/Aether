@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: cppcheck-report
-          path: build/debug/cppcheck_report.xml
+          path: build/Debug/cppcheck_report.xml
   uncrustify:
     # if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: uncrustify-report
-          path: build/debug/uncrustify_report.txt
+          path: build/Debug/uncrustify_report.txt
   unit-tests:
     runs-on: ubuntu-latest
     container:
@@ -103,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: unit-tests-log
-          path: build/debug/Testing/Temporary/LastTest.log
+          path: build/Debug/Testing/Temporary/LastTest.log
       - name: Generate coverage report
         run: cmake --build --preset Debug -j$(nproc) -t sonarqube-coverage
       - name: SonarQube scan
@@ -121,5 +121,5 @@ jobs:
             -Dsonar.pullrequest.branch=${{ github.head_ref }}
             -Dsonar.pullrequest.base=${{ github.base_ref }}
             --define sonar.cfamily.compile-commands=${{ env.BUILD_WRAPPER_OUT_DIR }}/compile_commands.json
-            --define sonar.coverageReportPaths=build/debug/coverage.xml
+            --define sonar.coverageReportPaths=build/Debug/coverage.xml
             ${{ github.ref_type == 'tag' && format('-Dsonar.branch.name={0}', github.ref_name) || '' }}
