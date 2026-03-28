@@ -363,12 +363,11 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
     case A_ROUTER_SESSION_STATE_CLOSED:
         a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
         session->state = A_ROUTER_SESSION_STATE_CONNECT;
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x closed", id);
+        A_LOG_INFO(a_Router_LogTag, "Session %#x closed", id);
         break;
     case A_ROUTER_SESSION_STATE_FAILED:
-        a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
-        session->state = A_ROUTER_SESSION_STATE_CONNECT;
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x failed", id);
+        /* Catch and handle failure cases here */
+        session->state = A_ROUTER_SESSION_STATE_CLOSED;
         break;
     default:
         session->state = A_ROUTER_SESSION_STATE_FAILED;
@@ -398,7 +397,7 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
     {
         session->state = A_ROUTER_SESSION_STATE_FAILED;
 
-        A_LOG_WARNING(a_Router_LogTag, "Session %#x failed connecting with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed connecting with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -450,7 +449,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
 
                 a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
-                A_LOG_DEBUG(a_Router_LogTag, "Session %#x opened", id);
+                A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
             }
             else
             {

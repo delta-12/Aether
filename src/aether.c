@@ -10,11 +10,24 @@
 #include "socket.h"
 #include "transport.h"
 
+static const char *const a_LogTag = "AETHER";
+
 a_Err_t a_Initialize(const a_Transport_PeerId_t id)
 {
     a_Random_Seed();
 
-    return a_Router_Initialize(id);
+    a_Err_t error = a_Router_Initialize(id);
+
+    if (A_ERR_NONE == error)
+    {
+        A_LOG_INFO(a_LogTag, "Initialized");
+    }
+    else
+    {
+        A_LOG_ERROR(a_LogTag, "Failed to initialized with error %s", a_Err_ToString(error));
+    }
+
+    return error;
 }
 
 void a_Deinitialize(void)
