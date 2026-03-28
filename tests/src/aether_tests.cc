@@ -6,7 +6,6 @@
 #include "aether.h"
 
 #define SERIAL_TEST_BUFFER_SIZE 256U
-// #define SPAN_FROM_VALUE(value, size) std::span<std::uint8_t>(static_cast<std::uint8_t *>(value), size)
 
 class Socket
 {
