@@ -28,12 +28,17 @@ jobs:
         uses: ./.github/actions/setup
       - name: Build check
         run: cmake --build --preset Release -j$(nproc) -t Aether
-      - name: Upload build
+      - name: Build Arduino library
+        if: ${{ success() }}
+        run: cmake --build --preset Release -j$(nproc) -t AetherArduino
+      - name: Upload build artifacts
         if: ${{ success() }}
         uses: actions/upload-artifact@v6
         with:
-          name: Aether-Release
-          path: build/Release/libAether.*
+          name: build-artifacts
+          path: |
+            build/Release/libAether.*
+            build/Release/AetherArduino.zip
   cppcheck:
     # if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest

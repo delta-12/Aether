@@ -28,15 +28,15 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-      - name: Download build artifact
+      - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
-          name: Aether-Release
-          path: ./Aether-Release
+          name: build-artifacts
+          path: ./artifacts
       - name: Create pre-release
         if: ${{ contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" ./Aether-Release/* \
+          gh release create "$tag" ./artifacts/* \
               --title="${tag#v}" \
               --generate-notes \
               --latest=false \
@@ -44,7 +44,7 @@ jobs:
       - name: Create release
         if: ${{ !contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" ./Aether-Release/* \
+          gh release create "$tag" ./artifacts/* \
               --title="${tag#v}" \
               --generate-notes \
               --latest=true
