@@ -1,5 +1,10 @@
 #include "log.h"
 
+#ifdef ARDUINO
+#define AETHER_LOG_ENABLED
+#define AETHER_LOG_LEVEL A_LOG_LEVEL_INFO
+#endif
+
 #ifdef AETHER_LOG_ENABLED
 #include <stdarg.h>
 #include <stdio.h>
