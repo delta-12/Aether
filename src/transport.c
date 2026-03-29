@@ -406,15 +406,13 @@ size_t a_Transport_GetMessageKeySize(a_Transport_Message_t *const message)
 
     if ((NULL != message) && (A_TRANSPORT_HEADER_SUBSCRIBE == message->header))
     {
-        const size_t size = Leb128_Decode64(&key_size, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+        uint64_t     key_size_u64;
+        const size_t size = Leb128_Decode64(&key_size_u64, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
 
         if (SIZE_MAX != size)
         {
+            key_size = key_size_u64;
             (void)a_Buffer_SetRead(&message->buffer, size);
-        }
-        else
-        {
-            key_size = SIZE_MAX;
         }
     }
 

@@ -120,6 +120,55 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 ################################################################################
+# Arduino
+################################################################################
+set(ARDUINO_LIB_NAME "AetherArduino")
+set(ARDUINO_LIB_DIR "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}")
+set(ARDUINO_SRC_DIR "${ARDUINO_LIB_DIR}/src")
+
+file(MAKE_DIRECTORY "${ARDUINO_SRC_DIR}")
+file(MAKE_DIRECTORY "${ARDUINO_EXAMPLES_DIR}")
+
+foreach(f ${SRCS})
+    configure_file(${f} ${ARDUINO_SRC_DIR} COPYONLY)
+endforeach()
+
+add_custom_target(${ARDUINO_LIB_NAME}-copy-headers
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${INCLUDE_DIR}
+            ${ARDUINO_SRC_DIR}
+)
+
+string(REGEX REPLACE "^v" "" ARUDINO_LIB_VERSION "${GIT_TAG}")
+string(REGEX REPLACE "-.*$" "" ARUDINO_LIB_VERSION "${ARUDINO_LIB_VERSION}")
+if(NOT ARUDINO_LIB_VERSION)
+    set(ARUDINO_LIB_VERSION "0.0.0")
+endif()
+file(WRITE "${ARDUINO_LIB_DIR}/library.properties"
+    "name=${ARDUINO_LIB_NAME}\n"
+    "version=${ARUDINO_LIB_VERSION}\n"
+    "author=delta-12\n"
+    "maintainer=delta-12\n"
+    "sentence=Aether is a peer-to-peer communication with pub/sub and queries.\n"
+    "paragraph=This is the Arduino version of Aether.\n"
+    "category=Communication\n"
+    "url=https://github.com/delta-12/aether\n"
+    "architectures=*\n"
+)
+
+add_custom_target(${ARDUINO_LIB_NAME}-lib
+    COMMENT "Generating Arduino library structure at ${ARDUINO_LIB_DIR}"
+    DEPENDS ${ARDUINO_LIB_NAME}-copy-headers
+)
+
+set(ARDUINO_LIB_ZIP "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
+add_custom_target(${ARDUINO_LIB_NAME}
+    DEPENDS ${ARDUINO_LIB_NAME}-lib
+    COMMAND ${CMAKE_COMMAND} -E tar "cf" "${ARDUINO_LIB_ZIP}" --format=zip ${ARDUINO_LIB_DIR}
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+
+################################################################################
 # Tests
 ################################################################################
 if(AETHER_BUILD_TESTS)
