@@ -78,7 +78,11 @@ void a_Log_SetLogLevel(const a_Log_Level_t level)
 void a_Log_RegisterCustomLogger(void (*log)(const char *const tag, const a_Log_Level_t level, const char *const format, ...))
 {
 #ifdef AETHER_LOG_ENABLED
-    if (NULL != log)
+    if (NULL == log)
+    {
+        a_Log_Mode = A_LOG_MODE_PRINT;
+    }
+    else
     {
         a_Log_CustomLog = log;
         a_Log_Mode      = A_LOG_MODE_CUSTOM;

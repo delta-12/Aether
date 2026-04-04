@@ -64,6 +64,7 @@ protected:
 
     void TearDown() override
     {
+        a_Log_RegisterCustomLogger(nullptr);
         delete mock_logger_;
     }
 
@@ -111,6 +112,13 @@ TEST_F(Log, RegisterCustomLogger)
     expected = "";
     testing::internal::CaptureStdout();
     EXPECT_CALL(*mock_logger_, LogTagLevelFormat(testing::StrEq(LogTag), A_LOG_LEVEL_INFO, testing::StrEq(LogFormat))).Times(1);
+    A_LOG_INFO(LogTag, LogFormat, LogIntegerArg, LogStringArg);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(expected, output);
+
+    a_Log_RegisterCustomLogger(nullptr);
+    expected = GetLogString(A_LOG_LEVEL_INFO, LogStringBody);
+    testing::internal::CaptureStdout();
     A_LOG_INFO(LogTag, LogFormat, LogIntegerArg, LogStringArg);
     output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(expected, output);
