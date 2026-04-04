@@ -3,7 +3,7 @@
 #ifdef ARDUINO
 #define AETHER_LOG_ENABLED
 #define AETHER_LOG_LEVEL A_LOG_LEVEL_INFO
-#endif
+#endif /* ARDUINO */
 
 #ifdef AETHER_LOG_ENABLED
 #include <stdarg.h>
@@ -58,10 +58,8 @@ _Static_assert(((AETHER_LOG_LEVEL >= 0) && (AETHER_LOG_LEVEL < A_LOG_LEVEL_MAX))
 static a_Log_Level_t a_Log_Level = AETHER_LOG_LEVEL;
 static a_Log_Mode_t  a_Log_Mode  = A_LOG_MODE_PRINT;
 
-static void (*a_Log_CustomLog)(const char *const tag, const a_Log_Level_t level, const char *const format, ...) = NULL;   /* Client-specified logging function, not be called directly */
-#endif /* AETHER_LOG_ENABLED */
+static void (*a_Log_CustomLog)(const char *const tag, const a_Log_Level_t level, const char *const format, ...) = NULL;          /* Client-specified logging function, not be called directly */
 
-#ifdef AETHER_LOG_ENABLED
 static void a_Log_Print(const char *const tag, const a_Log_Level_t level, const char *const format, va_list args);
 #endif /* AETHER_LOG_ENABLED */
 
@@ -80,7 +78,11 @@ void a_Log_SetLogLevel(const a_Log_Level_t level)
 void a_Log_RegisterCustomLogger(void (*log)(const char *const tag, const a_Log_Level_t level, const char *const format, ...))
 {
 #ifdef AETHER_LOG_ENABLED
-    if (NULL != log)
+    if (NULL == log)
+    {
+        a_Log_Mode = A_LOG_MODE_PRINT;
+    }
+    else
     {
         a_Log_CustomLog = log;
         a_Log_Mode      = A_LOG_MODE_CUSTOM;

@@ -1,5 +1,6 @@
 #include "router.h"
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,6 +42,7 @@ typedef struct
     a_Tick_Ms_t last_renew_received;
     a_Tick_Ms_t last_renew_sent;
     a_Transport_Message_t message;
+    bool accept_sent;
 } a_Router_Session_t;
 
 struct a_Router_SubscriberSession
@@ -72,6 +74,7 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
@@ -168,15 +171,16 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
             error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
         }
+
+        if (A_ERR_NONE == error)
+        {
+            A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
+        }
     }
 
     if (A_ERR_NONE != error)
     {
         A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
-    }
-    else
-    {
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
     }
 
     return error;
@@ -387,9 +391,10 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
     if (A_ERR_NONE == error)
     {
         session->state               = A_ROUTER_SESSION_STATE_ACCEPT;
-        session->retries             = AETHER_SESSION_RETRIES;
+        session->retries             = 1U;
         session->lease               = AETHER_SESSION_LEASE;
         session->last_renew_received = a_Tick_GetTick();
+        session->accept_sent         = false;
 
         A_LOG_DEBUG(a_Router_LogTag, "Session %#x connecting", id);
     }
@@ -407,13 +412,13 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
 {
     a_Err_t error = A_ERR_NONE;
 
-    if (session->retries > 0U)
+    if (session->retries <= AETHER_SESSION_RETRIES)
     {
         const a_Tick_Ms_t tick = a_Tick_GetTick();
 
-        if (a_Tick_GetElapsed(session->last_renew_received) > AETHER_SESSION_LEASE)
+        if (a_Tick_GetElapsed(session->last_renew_received) > (session->lease * session->retries))
         {
-            session->retries--;
+            session->retries++;
             session->last_renew_received = tick;
         }
         else
@@ -426,30 +431,23 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             }
             else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
             {
-                /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
-                /* TODO handle bad lease, i.e. A_TICK_MS_MAX */
-                a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
-                if (lease < session->lease)
-                {
-                    session->lease = lease;
-                }
-
+                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
                 session->last_renew_received = tick;
-
-                (void)a_Transport_MessageAccept(&session->message, session->lease);
-                error = a_Router_SessionMessageSend(id, session);
             }
-            else if ((A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message)) && (a_Transport_GetMessageLease(&session->message) == session->lease))
+            else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
             {
-                /* TODO verify MTU matches */
-
+                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
                 session->last_renew_received = tick;
-                session->last_renew_sent     = tick;
-                session->state               = A_ROUTER_SESSION_STATE_OPEN;
 
-                a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
+                if (session->accept_sent)
+                {
+                    session->last_renew_sent = tick;
+                    session->state           = A_ROUTER_SESSION_STATE_OPEN;
 
-                A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+                    a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
+
+                    A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+                }
             }
             else
             {
@@ -488,6 +486,8 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     {
         switch (a_Transport_GetMessageHeader(&session->message))
         {
+        case A_TRANSPORT_HEADER_ACCEPT:
+            break;
         case A_TRANSPORT_HEADER_CLOSE:
             session->state = A_ROUTER_SESSION_STATE_CLOSED;
             break;
@@ -503,7 +503,6 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             error                        = a_Router_SessionHandleSubscribe(id, session);
             break;
         case A_TRANSPORT_HEADER_CONNECT:
-        case A_TRANSPORT_HEADER_ACCEPT:
         default:
             A_LOG_ERROR(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
             break;
@@ -523,6 +522,43 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
         (void)a_Transport_MessageRenew(&session->message);
         error                    = a_Router_SessionMessageSend(id, session);
         session->last_renew_sent = tick;
+    }
+
+    return error;
+}
+
+static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
+{
+    /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
+
+    a_Err_t           error = A_ERR_NONE;
+    const a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
+
+    if (A_TICK_MS_MAX == lease)
+    {
+        error = A_ERR_SERIALIZATION;
+
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid lease", id);
+    }
+    else if (lease < session->lease)
+    {
+        session->lease = lease;
+    }
+
+    if ((A_ERR_NONE == error) && !session->accept_sent)
+    {
+        a_Transport_MessageReset(&session->message);
+        (void)a_Transport_MessageAccept(&session->message, session->lease);
+        error = a_Router_SessionMessageSend(id, session);
+
+        if (A_ERR_NONE == error)
+        {
+            session->accept_sent = true;
+        }
+        else
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to send accept message with error %s", id, a_Err_ToString(error));
+        }
     }
 
     return error;
