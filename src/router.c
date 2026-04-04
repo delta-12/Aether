@@ -537,7 +537,7 @@ static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t
     {
         error = A_ERR_SERIALIZATION;
 
-        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid lease");
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid lease", id);
     }
     else if (lease < session->lease)
     {
