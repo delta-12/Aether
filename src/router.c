@@ -171,15 +171,16 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
             error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
         }
+
+        if (A_ERR_NONE == error)
+        {
+            A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
+        }
     }
 
     if (A_ERR_NONE != error)
     {
         A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
-    }
-    else
-    {
-        A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
     }
 
     return error;
