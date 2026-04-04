@@ -74,6 +74,7 @@ static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Sess
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
@@ -429,47 +430,16 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             }
             else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
             {
-                /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
-                /* TODO handle bad lease, i.e. A_TICK_MS_MAX */
-                a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
-                if (lease < session->lease)
-                {
-                    session->lease = lease;
-                }
-
+                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
                 session->last_renew_received = tick;
-
-                a_Transport_MessageReset(&session->message);
-                (void)a_Transport_MessageAccept(&session->message, session->lease);
-                error = a_Router_SessionMessageSend(id, session);
-
-                if (A_ERR_NONE == error)
-                {
-                    session->accept_sent = true;
-                }
             }
             else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
             {
-                /* TODO verify MTU matches */
-
-                a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
-                if (lease < session->lease)
-                {
-                    session->lease = lease;
-                }
-
+                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
                 session->last_renew_received = tick;
 
-                if (!session->accept_sent)
+                if (session->accept_sent)
                 {
-                    a_Transport_MessageReset(&session->message);
-                    (void)a_Transport_MessageAccept(&session->message, session->lease);
-                    error = a_Router_SessionMessageSend(id, session);
-                }
-
-                if (A_ERR_NONE == error)
-                {
-                    session->accept_sent     = true;
                     session->last_renew_sent = tick;
                     session->state           = A_ROUTER_SESSION_STATE_OPEN;
 
@@ -551,6 +521,43 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
         (void)a_Transport_MessageRenew(&session->message);
         error                    = a_Router_SessionMessageSend(id, session);
         session->last_renew_sent = tick;
+    }
+
+    return error;
+}
+
+static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
+{
+    /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
+
+    a_Err_t           error = A_ERR_NONE;
+    const a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
+
+    if (A_TICK_MS_MAX == lease)
+    {
+        error = A_ERR_SERIALIZATION;
+
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid lease");
+    }
+    else if (lease < session->lease)
+    {
+        session->lease = lease;
+    }
+
+    if ((A_ERR_NONE == error) && !session->accept_sent)
+    {
+        a_Transport_MessageReset(&session->message);
+        (void)a_Transport_MessageAccept(&session->message, session->lease);
+        error = a_Router_SessionMessageSend(id, session);
+
+        if (A_ERR_NONE == error)
+        {
+            session->accept_sent = true;
+        }
+        else
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to send accept message with error %s", id, a_Err_ToString(error));
+        }
     }
 
     return error;
