@@ -97,9 +97,11 @@ TEST_F(Aether, Task)
     std::uint8_t connect_message[] = {0x01U, 0x08U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x01U, 0xE8U, 0x07U, 0x00U};
     std::uint8_t accept_message[] = {0x09U, 0x01U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x02U, 0xFAU, 0x01U, 0x00U};
     std::uint8_t renew_message[] = {0x07U, 0x03U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x03U, 0x00U};
-    std::uint8_t subscribe_message[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x04U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
-    std::uint8_t publish_message[] = {0x10U, 0x04U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x05U, 0xF8U, 0xABU, 0xE2U, 0xE3U, 0x17U, 0x01U, 0x02U, 0x03U, 0x04U, 0x00U};
-    std::uint8_t close_message[] = {0x07U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x06U, 0x00U};
+    std::uint8_t subscribe_message_first[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x04U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
+    std::uint8_t subscribe_message_second[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x05U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
+    std::uint8_t subscribe_message_third[] = {0x0CU, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x06U, 0x05U, 0x2FU, 0x71U, 0x75U, 0x78U, 0x01U, 0x00U};
+    std::uint8_t publish_message[] = {0x10U, 0x04U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x07U, 0xF8U, 0xABU, 0xE2U, 0xE3U, 0x17U, 0x01U, 0x02U, 0x03U, 0x04U, 0x00U};
+    std::uint8_t close_message[] = {0x07U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x08U, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
     a_AddSocket(&socket_, A_MODE_CONNECT, message_buffer_, sizeof(message_buffer_));
@@ -130,9 +132,18 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(renew_message[i]), testing::Return(1U)));
         }
-        for (std::size_t i = 0U; i < sizeof(subscribe_message); i++)
+        for (std::size_t i = 0U; i < sizeof(subscribe_message_first); i++)
         {
-            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message[i]), testing::Return(1U)));
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_first[i]), testing::Return(1U)));
+        }
+        for (std::size_t i = 0U; i < sizeof(subscribe_message_second); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_second[i]), testing::Return(1U)));
+        }
+        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
+        for (std::size_t i = 0U; i < sizeof(subscribe_message_third); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_third[i]), testing::Return(1U)));
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(publish_message); i++)
@@ -161,13 +172,29 @@ TEST_F(Aether, Task)
 
     a_Task(); // Do nothing
     a_Task(); // Receive renew
-    a_Task(); // Receive subscribe
 
+    a_EnableRouting(false);
+    a_Task(); // Receive subscribe first
     ASSERT_EQ(A_ERR_NONE, a_Publish("/baz", data, sizeof(data)));
+    a_Declare("/baz");
+    a_Task(); // Receive subscribe second
+    ASSERT_EQ(A_ERR_NONE, a_Publish("/baz", data, sizeof(data)));
+
+    a_EnableRouting(true);
+    a_Task(); // Receive subscribe third
+    ASSERT_EQ(A_ERR_NONE, a_Publish("/qux", data, sizeof(data)));
 
     a_Task(); // Receive publish
     a_Task(); // Receive close
     a_Task(); // Close session
+}
+
+TEST_F(Aether, Declare)
+{
+    a_Initialize(A_TRANSPORT_PEER_ID_MAX);
+    a_AddSocket(&socket_, A_MODE_CONNECT, message_buffer_, sizeof(message_buffer_));
+
+    ASSERT_EQ(A_ERR_NULL, a_Declare(nullptr));
 }
 
 TEST_F(Aether, Publish)

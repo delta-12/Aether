@@ -1,5 +1,6 @@
 #include "aether.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -40,6 +41,11 @@ void a_SetLogLevel(const a_Log_Level_t level)
     a_Log_SetLogLevel(level);
 }
 
+void a_EnableRouting(const bool enable)
+{
+    a_Routing_EnableRouting(enable);
+}
+
 a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size)
 {
     /* TODO set mode */
@@ -51,6 +57,11 @@ a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t
 void a_Task(void)
 {
     a_Router_Task();
+}
+
+a_Err_t a_Declare(const char *const key)
+{
+    return a_Router_Declare(key);
 }
 
 a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size)
