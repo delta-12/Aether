@@ -62,6 +62,7 @@ typedef struct
 static const char *const            a_Router_LogTag         = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId         = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber = 0U;
+static bool                         a_Router_RoutingEnabled = true;
 static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
 static a_Hashmap_t                  a_Router_Subscriptions;
@@ -119,6 +120,11 @@ void a_Router_Deinitialize(void)
     a_Hashmap_Deinitialize(&a_Router_SequenceNumbers);
     a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_FreeSubscriptionCallback, NULL);
     a_Hashmap_Deinitialize(&a_Router_Subscriptions);
+}
+
+void a_Routing_EnableRouting(const bool enable)
+{
+    a_Router_RoutingEnabled = enable;
 }
 
 void a_Router_Task(void)
@@ -181,6 +187,42 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
     if (A_ERR_NONE != error)
     {
         A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
+    }
+
+    return error;
+}
+
+a_Err_t a_Router_Declare(const char *const key)
+{
+    a_Err_t error = A_ERR_NONE;
+
+    if (NULL == key)
+    {
+        error = A_ERR_NULL;
+    }
+    else
+    {
+        const size_t                         key_size     = a_Transport_GetStringSize(key);
+        const a_Hash_t                       hash         = a_Hash_String(key, key_size);
+        const a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
+
+        if (NULL == subscription)
+        {
+            a_Router_Subscription_t new_subscription = {
+                .sessions = NULL,
+                .function = NULL,
+                .arg      = NULL,
+                .key      = a_malloc(key_size),
+            };
+            a_Transport_CopyString(new_subscription.key, key, key_size);
+
+            error = a_Hashmap_Insert(&a_Router_Subscriptions, &hash, sizeof(hash), &new_subscription, sizeof(new_subscription));
+        }
+    }
+
+    if (A_ERR_NONE != error)
+    {
+        A_LOG_ERROR(a_Router_LogTag, "Failed to declare key with error %s", a_Err_ToString(error));
     }
 
     return error;
@@ -700,7 +742,26 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
         const a_Hash_t                 hash         = a_Hash_String(key, key_size);
         a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
 
-        if (NULL == subscription)
+        if (NULL != subscription)
+        {
+            const a_Router_SubscriberSession_t *subscriber_session = subscription->sessions;
+
+            while ((NULL != subscriber_session) && (id != subscriber_session->id))
+            {
+                subscriber_session = subscriber_session->next;
+            }
+
+            if (NULL == subscriber_session)
+            {
+                a_Router_SubscriberSession_t *const new_subscriber_session = a_malloc(sizeof(a_Router_SubscriberSession_t));
+                new_subscriber_session->id   = id;
+                new_subscriber_session->next = subscription->sessions;
+                subscription->sessions       = new_subscriber_session;
+
+                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
+            }
+        }
+        else if (a_Router_RoutingEnabled)
         {
             a_Router_Subscription_t new_subscription = {
                 .sessions = a_malloc(sizeof(a_Router_SubscriberSession_t)),
@@ -721,25 +782,6 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
             else
             {
                 A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to register subscription with error %s", id, a_Err_ToString(error));
-            }
-        }
-        else
-        {
-            const a_Router_SubscriberSession_t *subscriber_session = subscription->sessions;
-
-            while ((NULL != subscriber_session) && (id != subscriber_session->id))
-            {
-                subscriber_session = subscriber_session->next;
-            }
-
-            if (NULL == subscriber_session)
-            {
-                a_Router_SubscriberSession_t *const new_subscriber_session = a_malloc(sizeof(a_Router_SubscriberSession_t));
-                new_subscriber_session->id   = id;
-                new_subscriber_session->next = subscription->sessions;
-                subscription->sessions       = new_subscriber_session;
-
-                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
             }
         }
     }

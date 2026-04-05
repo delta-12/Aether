@@ -1,6 +1,7 @@
 #ifndef AETHER_H
 #define AETHER_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,8 +24,10 @@ extern "C"
 a_Err_t a_Initialize(const a_Transport_PeerId_t id);
 void a_Deinitialize(void);
 void a_SetLogLevel(const a_Log_Level_t level);
+void a_EnableRouting(const bool enable);
 a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size);
 void a_Task(void);
+a_Err_t a_Declare(const char *const key);
 a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size);
 a_Err_t a_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg);
 a_Err_t a_Query(void);
