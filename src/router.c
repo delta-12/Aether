@@ -125,6 +125,15 @@ void a_Router_Deinitialize(void)
 void a_Routing_EnableRouting(const bool enable)
 {
     a_Router_RoutingEnabled = enable;
+
+    if (a_Router_RoutingEnabled)
+    {
+        A_LOG_DEBUG(a_Router_LogTag, "Routing enabled");
+    }
+    else
+    {
+        A_LOG_DEBUG(a_Router_LogTag, "Routing disabled");
+    }
 }
 
 void a_Router_Task(void)
