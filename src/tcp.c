@@ -115,6 +115,7 @@ a_Err_t a_Tcp_Receive(a_Socket_t *const socket, a_Buffer_t *const data)
             {
                 (void)a_Buffer_SetRead(&socket->receive_buffer, sizeof(A_TCP_SIZE_MAX));
                 error = a_Buffer_Copy(data, &socket->receive_buffer);
+                (void)a_Buffer_Clear(&socket->receive_buffer);
             }
         }
     }

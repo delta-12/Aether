@@ -106,8 +106,69 @@ TEST_F(Tcp, Send)
 
 TEST_F(Tcp, Receive)
 {
+    std::uint8_t length[TCP_LENGTH_SIZE] = {0x00U, 0x06U};
+    std::uint8_t data[] = {0x01U, 0x02U, 0x00U, 0x03U, 0x04U, 0x05U};
+    std::uint8_t received[sizeof(data)] = {0x00U};
+
+    {
+        testing::InSequence sequence;
+
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length, length + (sizeof(length) / 2U)), testing::Return(sizeof(length) / 2U)));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE - 1U))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length + (sizeof(length) / 2U), length + sizeof(length)), testing::Return(sizeof(length) / 2U)));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data))).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data)))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data, data + (sizeof(data) / 2U)), testing::Return(sizeof(data) / 2U)));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data + (sizeof(data) / 2U), data + sizeof(data)), testing::Return(sizeof(data) / 2U)));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length, length + sizeof(length)), testing::Return(sizeof(length))));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data)))
+            .Times(1)
+            .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data, data + sizeof(data)), testing::Return(sizeof(data))));
+    }
+
+    a_Buffer_Initialize(&buffer_, received, sizeof(received));
+
     ASSERT_EQ(A_ERR_NULL, a_Tcp_Receive(nullptr, &buffer_));
     ASSERT_EQ(A_ERR_NULL, a_Tcp_Receive(&socket_, nullptr));
 
-    // TODO
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(TCP_LENGTH_SIZE / 2U, a_Buffer_GetReadSize(&socket_.receive_buffer));
+
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(TCP_LENGTH_SIZE, a_Buffer_GetReadSize(&socket_.receive_buffer));
+
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(TCP_LENGTH_SIZE + (sizeof(data) / 2U), a_Buffer_GetReadSize(&socket_.receive_buffer));
+
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(TCP_LENGTH_SIZE + (sizeof(data) / 2U), a_Buffer_GetReadSize(&socket_.receive_buffer));
+
+    ASSERT_EQ(A_ERR_SOCKET, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(TCP_LENGTH_SIZE + (sizeof(data) / 2U), a_Buffer_GetReadSize(&socket_.receive_buffer));
+
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(sizeof(data), a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&socket_.receive_buffer));
+    ASSERT_THAT(received, testing::ElementsAreArray(data));
+
+    a_Buffer_SetRead(&buffer_, sizeof(data));
+    ASSERT_EQ(A_ERR_NONE, a_Tcp_Receive(&socket_, &buffer_));
+    ASSERT_EQ(sizeof(data), a_Buffer_GetReadSize(&buffer_));
+    ASSERT_EQ(0U, a_Buffer_GetReadSize(&socket_.receive_buffer));
+    ASSERT_THAT(received, testing::ElementsAreArray(data));
 }
