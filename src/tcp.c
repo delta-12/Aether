@@ -20,7 +20,8 @@ a_Err_t a_Tcp_Send(a_Socket_t *const socket, a_Buffer_t *const data)
     {
         error = A_ERR_NULL;
     }
-    else if (a_Buffer_GetReadSize(data) > A_TCP_SIZE_MAX)
+    else if ((a_Buffer_GetReadSize(data) > (a_Buffer_GetWriteSize(&socket->send_buffer) - sizeof(A_TCP_SIZE_MAX)))
+             || (a_Buffer_GetReadSize(data) > A_TCP_SIZE_MAX))
     {
         error = A_ERR_SIZE;
     }
@@ -34,28 +35,18 @@ a_Err_t a_Tcp_Send(a_Socket_t *const socket, a_Buffer_t *const data)
             (void)a_Buffer_SetWrite(&socket->send_buffer, 1U);
         }
 
-        size_t sent = socket->send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer));
-        if (a_Buffer_GetReadSize(&socket->send_buffer) != sent)
+        (void)a_Buffer_AppendRight(&socket->send_buffer, data);
+        (void)a_Buffer_SetRead(data, size);
+
+        const size_t sent = socket->send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer));
+
+        if (SIZE_MAX == sent)
         {
             error = A_ERR_SOCKET;
         }
         else
         {
             (void)a_Buffer_SetRead(&socket->send_buffer, sent);
-        }
-
-        if (A_ERR_NONE == error)
-        {
-            sent = socket->send(a_Buffer_GetRead(data), size);
-
-            if (size != sent)
-            {
-                error = A_ERR_SOCKET;
-            }
-            else
-            {
-                (void)a_Buffer_SetRead(data, sent);
-            }
         }
     }
 

@@ -5,7 +5,7 @@
 
 #include "aether.h"
 
-#define SERIAL_TEST_BUFFER_SIZE 256U
+#define AETHER_TEST_BUFFER_SIZE 256U
 
 class Socket
 {
@@ -68,8 +68,8 @@ protected:
     static MockSocket *mock_socket_;
     static MockSubscriber *mock_subscriber_;
     a_Socket_t socket_;
-    std::uint8_t send_buffer_[SERIAL_TEST_BUFFER_SIZE];
-    std::uint8_t receive_buffer_[SERIAL_TEST_BUFFER_SIZE];
+    std::uint8_t send_buffer_[AETHER_TEST_BUFFER_SIZE];
+    std::uint8_t receive_buffer_[AETHER_TEST_BUFFER_SIZE];
     std::uint8_t message_buffer_[AETHER_TRANSPORT_MTU];
 };
 
