@@ -15,10 +15,11 @@ typedef enum
 
 typedef struct
 {
-    a_Err_t (*start)(void);
-    a_Err_t (*stop)(void);
-    size_t (*send)(const uint8_t *const data, const size_t size);
-    size_t (*receive)(uint8_t *const data, const size_t size);
+    a_Err_t (*start)(void *arg);
+    a_Err_t (*stop)(void *arg);
+    size_t (*send)(const uint8_t *const data, const size_t size, void *arg);
+    size_t (*receive)(uint8_t *const data, const size_t size, void *arg);
+    void *arg;
 } a_Socket_Functions_t;
 
 typedef struct

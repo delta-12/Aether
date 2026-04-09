@@ -54,7 +54,7 @@ a_Err_t a_Socket_Start(const a_Socket_t *const socket)
     }
     else if (NULL != socket->functions.start)
     {
-        error = socket->functions.start();
+        error = socket->functions.start(socket->functions.arg);
     }
 
     return error;
@@ -70,7 +70,7 @@ a_Err_t a_Socket_Stop(const a_Socket_t *const socket)
     }
     else if (NULL != socket->functions.stop)
     {
-        error = socket->functions.stop();
+        error = socket->functions.stop(socket->functions.arg);
     }
 
     return error;

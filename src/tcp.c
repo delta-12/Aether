@@ -38,7 +38,7 @@ a_Err_t a_Tcp_Send(a_Socket_t *const socket, a_Buffer_t *const data)
         (void)a_Buffer_AppendRight(&socket->send_buffer, data);
         (void)a_Buffer_SetRead(data, size);
 
-        const size_t sent = socket->functions.send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer));
+        const size_t sent = socket->functions.send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer), socket->functions.arg);
 
         if (SIZE_MAX == sent)
         {
@@ -67,7 +67,7 @@ a_Err_t a_Tcp_Receive(a_Socket_t *const socket, a_Buffer_t *const data)
 
         if (size < sizeof(A_TCP_SIZE_MAX))
         {
-            const size_t received = socket->functions.receive(a_Buffer_GetWrite(&socket->receive_buffer), (sizeof(A_TCP_SIZE_MAX) - size));
+            const size_t received = socket->functions.receive(a_Buffer_GetWrite(&socket->receive_buffer), (sizeof(A_TCP_SIZE_MAX) - size), socket->functions.arg);
 
             if (SIZE_MAX == received)
             {
@@ -100,7 +100,7 @@ a_Err_t a_Tcp_Receive(a_Socket_t *const socket, a_Buffer_t *const data)
 
         if ((A_ERR_NONE == error) && (size > 0U))
         {
-            const size_t received = socket->functions.receive(a_Buffer_GetWrite(&socket->receive_buffer), size);
+            const size_t received = socket->functions.receive(a_Buffer_GetWrite(&socket->receive_buffer), size, socket->functions.arg);
 
             if (SIZE_MAX == received)
             {
