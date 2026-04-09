@@ -45,7 +45,7 @@ protected:
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_));
+        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_TCP, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
         a_Buffer_Initialize(&buffer_, data_buffer_, sizeof(data_buffer_));
     }
 

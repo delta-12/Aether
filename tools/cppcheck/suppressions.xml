@@ -20,4 +20,10 @@
         <fileName>*/src/memory.c</fileName>
     </suppress>
 
+    <!-- Suppress static linkage for functions to be used outside of translation unit -->
+    <suppress>
+        <id>staticFunction</id>
+        <symbolName>a_Router_SessionDelete</symbolName>
+    </suppress>
+
 </suppressions>

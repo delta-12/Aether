@@ -57,16 +57,16 @@ MockSocket *Socket::mock_socket_ = nullptr;
 
 TEST_F(Socket, Initialize)
 {
-    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(nullptr, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_)));
-    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, nullptr, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_)));
-    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, nullptr, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_)));
-    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), nullptr, receive_buffer_, sizeof(receive_buffer_)));
-    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, nullptr, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(nullptr, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = nullptr, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = nullptr}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, nullptr, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NULL, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), nullptr, sizeof(receive_buffer_)));
 
-    ASSERT_EQ(A_ERR_SIZE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, 2U, Receive, receive_buffer_, sizeof(receive_buffer_)));
-    ASSERT_EQ(A_ERR_SIZE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, 2U));
+    ASSERT_EQ(A_ERR_SIZE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, 2U, receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_SIZE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, 2U));
 
-    ASSERT_EQ(A_ERR_NONE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_)));
+    ASSERT_EQ(A_ERR_NONE, a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_)));
 }
 
 TEST_F(Socket, Send)
@@ -76,7 +76,7 @@ TEST_F(Socket, Send)
 
     a_Buffer_Initialize(&buffer, data, sizeof(data));
     a_Buffer_SetWrite(&buffer, sizeof(data));
-    a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_));
+    a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
 
     ASSERT_EQ(A_ERR_NULL, a_Socket_Send(nullptr, &buffer));
     ASSERT_EQ(A_ERR_NULL, a_Socket_Send(&socket_, nullptr));
@@ -88,7 +88,7 @@ TEST_F(Socket, Receive)
     a_Buffer_t buffer;
 
     a_Buffer_Initialize(&buffer, data, sizeof(data));
-    a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_));
+    a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
 
     ASSERT_EQ(A_ERR_NULL, a_Socket_Receive(nullptr, &buffer));
     ASSERT_EQ(A_ERR_NULL, a_Socket_Receive(&socket_, nullptr));
