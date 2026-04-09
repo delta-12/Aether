@@ -44,7 +44,7 @@ a_Err_t a_Socket_Initialize(a_Socket_t *const socket,
     return error;
 }
 
-a_Err_t a_Socket_Start(a_Socket_t *const socket)
+a_Err_t a_Socket_Start(const a_Socket_t *const socket)
 {
     a_Err_t error = A_ERR_NONE;
 
@@ -60,7 +60,7 @@ a_Err_t a_Socket_Start(a_Socket_t *const socket)
     return error;
 }
 
-a_Err_t a_Socket_Stop(a_Socket_t *const socket)
+a_Err_t a_Socket_Stop(const a_Socket_t *const socket)
 {
     a_Err_t error = A_ERR_NONE;
 

@@ -3,28 +3,16 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "mock_socket.h"
+
 #include "aether.h"
 
 #define AETHER_TEST_BUFFER_SIZE 256U
-
-class Socket
-{
-public:
-    virtual std::size_t Send(const std::uint8_t *const data, const std::size_t size) const = 0;
-    virtual std::size_t Receive(std::uint8_t *const data, const std::size_t size) const = 0;
-};
 
 class Subscriber
 {
 public:
     virtual void Callback(const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg) const = 0;
-};
-
-class MockSocket : public Socket
-{
-public:
-    MOCK_METHOD(std::size_t, Send, (const std::uint8_t *const data, const std::size_t size), (const, override));
-    MOCK_METHOD(std::size_t, Receive, (std::uint8_t *const data, const std::size_t size), (const, override));
 };
 
 class MockSubscriber : public Subscriber

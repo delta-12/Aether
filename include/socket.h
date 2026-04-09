@@ -41,8 +41,8 @@ a_Err_t a_Socket_Initialize(a_Socket_t *const socket,
                             const size_t send_buffer_size,
                             uint8_t *const receive_buffer,
                             const size_t receive_buffer_size);
-a_Err_t a_Socket_Start(a_Socket_t *const socket);
-a_Err_t a_Socket_Stop(a_Socket_t *const socket);
+a_Err_t a_Socket_Start(const a_Socket_t *const socket);
+a_Err_t a_Socket_Stop(const a_Socket_t *const socket);
 a_Err_t a_Socket_Send(a_Socket_t *const socket, a_Buffer_t *const data);
 a_Err_t a_Socket_Receive(a_Socket_t *const socket, a_Buffer_t *const data);
 
