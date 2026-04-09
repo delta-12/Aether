@@ -198,11 +198,19 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
     if (NULL != session)
     {
-        session->state = A_ROUTER_SESSION_STATE_CLOSED;
+        if ((A_ROUTER_SESSION_STATE_CLOSED != session->state) && (A_ROUTER_SESSION_STATE_FAILED != session->state))
+        {
+            session->state = A_ROUTER_SESSION_STATE_CLOSED;
 
-        a_Transport_MessageReset(&session->message);
-        (void)a_Transport_MessageClose(&session->message);
-        error = a_Router_SessionMessageSend(id, session);
+            a_Transport_MessageReset(&session->message);
+            (void)a_Transport_MessageClose(&session->message);
+            error = a_Router_SessionMessageSend(id, session);
+
+            if (A_ERR_NONE == error)
+            {
+                error = a_Socket_Stop(&session->socket);
+            }
+        }
 
         if (A_ERR_NONE == error)
         {
@@ -619,6 +627,7 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
     }
     else
     {
+        session->deletion.id   = id;
         session->deletion.next = a_Router_DeleteList;
         a_Router_DeleteList    = &session->deletion;
     }
