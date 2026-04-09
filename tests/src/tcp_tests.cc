@@ -6,6 +6,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "mock_socket.h"
+
 #include "buffer.h"
 #include "err.h"
 #include "tcp.h"
@@ -14,20 +16,6 @@
 #define TCP_TEST_SOCKET_BUFFER_SIZE 2048U
 #define TCP_TEST_DATA_BUFFER_SIZE 65536U
 #define TCP_LENGTH_SIZE sizeof(std::uint16_t)
-
-class Socket
-{
-public:
-    virtual std::size_t Send(const std::uint8_t *const data, const std::size_t size) const = 0;
-    virtual std::size_t Receive(std::uint8_t *const data, const std::size_t size) const = 0;
-};
-
-class MockSocket : public Socket
-{
-public:
-    MOCK_METHOD(std::size_t, Send, (const std::uint8_t *const data, const std::size_t size), (const, override));
-    MOCK_METHOD(std::size_t, Receive, (std::uint8_t *const data, const std::size_t size), (const, override));
-};
 
 class Tcp : public testing::Test
 {
@@ -45,7 +33,7 @@ protected:
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, Send, send_buffer_, sizeof(send_buffer_), Receive, receive_buffer_, sizeof(receive_buffer_));
+        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_TCP, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
         a_Buffer_Initialize(&buffer_, data_buffer_, sizeof(data_buffer_));
     }
 

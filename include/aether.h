@@ -10,12 +10,6 @@
 #include "socket.h"
 #include "transport.h"
 
-typedef enum
-{
-    A_MODE_CONNECT,
-    A_MODE_LISTEN
-} a_Mode_t;
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -25,7 +19,7 @@ a_Err_t a_Initialize(const a_Transport_PeerId_t id);
 void a_Deinitialize(void);
 void a_SetLogLevel(const a_Log_Level_t level);
 void a_EnableRouting(const bool enable);
-a_Err_t a_AddSocket(const a_Socket_t *const socket, const a_Mode_t mode, uint8_t *const message_buffer, const size_t message_buffer_size);
+a_Err_t a_AddSocket(const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain);
 void a_Task(void);
 a_Err_t a_Declare(const char *const key);
 a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size);

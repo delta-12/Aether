@@ -20,7 +20,7 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id);
 void a_Router_Deinitialize(void);
 void a_Routing_EnableRouting(const bool enable);
 void a_Router_Task(void);
-a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket, uint8_t *const buffer, const size_t size);
+a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket, uint8_t *const buffer, const size_t size, const bool retain);
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id);
 a_Err_t a_Router_Declare(const char *const key);
 a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const size_t size);

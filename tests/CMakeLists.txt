@@ -52,6 +52,10 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         ${${PROJECT_NAME}_SRCS}
 )
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE

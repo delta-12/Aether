@@ -12,16 +12,15 @@
 
 a_Err_t a_Socket_Initialize(a_Socket_t *const socket,
                             const a_Socket_Type_t type,
-                            size_t (*send)(const uint8_t *const, const size_t),
+                            const a_Socket_Functions_t functions,
                             uint8_t *const send_buffer,
                             const size_t send_buffer_size,
-                            size_t (*receive)(uint8_t *const, const size_t),
                             uint8_t *const receive_buffer,
                             const size_t receive_buffer_size)
 {
     a_Err_t error = A_ERR_NONE;
 
-    if ((NULL == socket) || (NULL == send) || (NULL == receive))
+    if ((NULL == socket) || (NULL == functions.send) || (NULL == functions.receive))
     {
         error = A_ERR_NULL;
     }
@@ -31,9 +30,8 @@ a_Err_t a_Socket_Initialize(a_Socket_t *const socket,
     }
     else
     {
-        socket->type    = type;
-        socket->send    = send;
-        socket->receive = receive;
+        socket->type      = type;
+        socket->functions = functions;
 
         error = a_Buffer_Initialize(&socket->send_buffer, send_buffer, send_buffer_size);
 
@@ -41,6 +39,38 @@ a_Err_t a_Socket_Initialize(a_Socket_t *const socket,
         {
             error = a_Buffer_Initialize(&socket->receive_buffer, receive_buffer, receive_buffer_size);
         }
+    }
+
+    return error;
+}
+
+a_Err_t a_Socket_Start(const a_Socket_t *const socket)
+{
+    a_Err_t error = A_ERR_NONE;
+
+    if (NULL == socket)
+    {
+        error = A_ERR_NULL;
+    }
+    else if (NULL != socket->functions.start)
+    {
+        error = socket->functions.start();
+    }
+
+    return error;
+}
+
+a_Err_t a_Socket_Stop(const a_Socket_t *const socket)
+{
+    a_Err_t error = A_ERR_NONE;
+
+    if (NULL == socket)
+    {
+        error = A_ERR_NULL;
+    }
+    else if (NULL != socket->functions.stop)
+    {
+        error = socket->functions.stop();
     }
 
     return error;
