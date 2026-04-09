@@ -67,6 +67,7 @@ set(SRCS
     ${SRC_DIR}/router.c
     ${SRC_DIR}/serial.c
     ${SRC_DIR}/socket.c
+    ${SRC_DIR}/tcp.c
     ${SRC_DIR}/tick.c
     ${SRC_DIR}/transport.c
 )

@@ -41,6 +41,8 @@ set(${PROJECT_NAME}_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/random_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/router_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/serial_tests.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/socket_tests.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tcp_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tick_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/transport_tests.cc
 )

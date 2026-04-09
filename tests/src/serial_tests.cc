@@ -17,14 +17,14 @@ class Socket
 {
 public:
     virtual std::size_t Send(const std::uint8_t *const data, const std::size_t size) const = 0;
-    virtual std::size_t Receive(uint8_t *const data, const size_t size) const = 0;
+    virtual std::size_t Receive(std::uint8_t *const data, const std::size_t size) const = 0;
 };
 
 class MockSocket : public Socket
 {
 public:
     MOCK_METHOD(std::size_t, Send, (const std::uint8_t *const data, const std::size_t size), (const, override));
-    MOCK_METHOD(std::size_t, Receive, (uint8_t *const data, const size_t size), (const, override));
+    MOCK_METHOD(std::size_t, Receive, (std::uint8_t *const data, const std::size_t size), (const, override));
 };
 
 class Serial : public testing::Test
@@ -35,7 +35,7 @@ protected:
         return mock_socket_->Send(data, size);
     }
 
-    static std::size_t Receive(uint8_t *const data, const size_t size)
+    static std::size_t Receive(std::uint8_t *const data, const std::size_t size)
     {
         return mock_socket_->Receive(data, size);
     }
