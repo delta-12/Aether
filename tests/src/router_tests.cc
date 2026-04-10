@@ -14,19 +14,19 @@
 class Router : public testing::Test
 {
 protected:
-    static a_Err_t Stop(void)
+    static a_Err_t Stop(void *arg)
     {
-        return mock_socket_->Stop();
+        return mock_socket_->Stop(arg);
     }
 
-    static std::size_t Send(const std::uint8_t *const data, const std::size_t size)
+    static std::size_t Send(const std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Send(data, size);
+        return mock_socket_->Send(data, size, arg);
     }
 
-    static std::size_t Receive(std::uint8_t *const data, const std::size_t size)
+    static std::size_t Receive(std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Receive(data, size);
+        return mock_socket_->Receive(data, size, arg);
     }
 
     void SetUp() override
@@ -59,8 +59,8 @@ TEST_F(Router, Task)
 
     a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false);
     ASSERT_EQ(A_ERR_DUPLICATE, a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false));
-    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
-    EXPECT_CALL(*mock_socket_, Stop()).Times(1).WillOnce(testing::Return(A_ERR_NONE));
+    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+    EXPECT_CALL(*mock_socket_, Stop(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
     a_Router_Task(); // Send connect
     a_Router_Task(); // Failed
     a_Router_Task(); // Closed
@@ -75,8 +75,8 @@ TEST_F(Router, SessionDelete)
     ASSERT_EQ(A_ERR_NONE, a_Router_SessionDelete(0U));
 
     a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), true);
-    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
-    EXPECT_CALL(*mock_socket_, Stop()).Times(1).WillOnce(testing::Return(A_ERR_NONE));
+    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
+    EXPECT_CALL(*mock_socket_, Stop(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
     ASSERT_EQ(A_ERR_NONE, a_Router_SessionDelete(id));
 
     // TODO

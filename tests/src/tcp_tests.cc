@@ -20,14 +20,14 @@
 class Tcp : public testing::Test
 {
 protected:
-    static std::size_t Send(const std::uint8_t *const data, const std::size_t size)
+    static std::size_t Send(const std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Send(data, size);
+        return mock_socket_->Send(data, size, arg);
     }
 
-    static std::size_t Receive(std::uint8_t *const data, const std::size_t size)
+    static std::size_t Receive(std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Receive(data, size);
+        return mock_socket_->Receive(data, size, arg);
     }
 
     void SetUp() override
@@ -60,11 +60,11 @@ TEST_F(Tcp, Send)
     {
         testing::InSequence sequence;
 
-        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
         EXPECT_CALL(*mock_socket_, Send(testing::Truly([&data](const std::uint8_t *const sent)
                                                        { return (0 == std::memcmp(sent + 2U, data, sizeof(data))) &&
                                                                 (0 == std::memcmp((sent + 2U + send_size), data, sizeof(data))); }),
-                                        send_size * 2U))
+                                        send_size * 2U, testing::_))
             .Times(2)
             .WillOnce(testing::Return(send_size))
             .WillOnce(testing::Return(send_size * 2U));
@@ -101,25 +101,25 @@ TEST_F(Tcp, Receive)
     {
         testing::InSequence sequence;
 
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE, testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length, length + (sizeof(length) / 2U)), testing::Return(sizeof(length) / 2U)));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE - 1U))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE - 1U, testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length + (sizeof(length) / 2U), length + sizeof(length)), testing::Return(sizeof(length) / 2U)));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data))).Times(1).WillOnce(testing::Return(0U));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data)))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data), testing::_)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data), testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data, data + (sizeof(data) / 2U)), testing::Return(sizeof(data) / 2U)));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U)).Times(1).WillOnce(testing::Return(0U));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U)).Times(1).WillOnce(testing::Return(SIZE_MAX));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U, testing::_)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data) / 2U, testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data + (sizeof(data) / 2U), data + sizeof(data)), testing::Return(sizeof(data) / 2U)));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, TCP_LENGTH_SIZE, testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(length, length + sizeof(length)), testing::Return(sizeof(length))));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data)))
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, sizeof(data), testing::_))
             .Times(1)
             .WillOnce(testing::DoAll(testing::SetArrayArgument<0>(data, data + sizeof(data)), testing::Return(sizeof(data))));
     }

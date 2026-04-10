@@ -380,7 +380,7 @@ static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Rout
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending message with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to send message with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -417,7 +417,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 
     if (A_ERR_NONE != error)
     {
-        A_LOG_ERROR(a_Router_LogTag, "Session %#x receiving message with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to receive message with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -487,7 +487,7 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
     {
         session->state = A_ROUTER_SESSION_STATE_FAILED;
 
-        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed connecting with error %s", id, a_Err_ToString(error));
+        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to connect with error %s", id, a_Err_ToString(error));
     }
 
     return error;
@@ -564,8 +564,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
 
     if (A_ERR_NONE != error)
     {
-        /* Error receiving message */
-        A_LOG_WARNING(a_Router_LogTag, "Session %#x failed to receive message with error %s", id, a_Err_ToString(error));
+        session->state = A_ROUTER_SESSION_STATE_FAILED;
     }
     else if (a_Transport_IsMessageDeserialized(&session->message))
     {

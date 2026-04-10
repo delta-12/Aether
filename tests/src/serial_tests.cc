@@ -18,20 +18,20 @@
 class Serial : public testing::Test
 {
 protected:
-    static std::size_t Send(const std::uint8_t *const data, const std::size_t size)
+    static std::size_t Send(const std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Send(data, size);
+        return mock_socket_->Send(data, size, arg);
     }
 
-    static std::size_t Receive(std::uint8_t *const data, const std::size_t size)
+    static std::size_t Receive(std::uint8_t *const data, const std::size_t size, void *arg)
     {
-        return mock_socket_->Receive(data, size);
+        return mock_socket_->Receive(data, size, arg);
     }
 
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
+        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = nullptr, .send = Send, .receive = Receive, .arg = nullptr}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
     }
 
     void TearDown() override
@@ -56,11 +56,11 @@ TEST_F(Serial, Send)
     {
         testing::InSequence sequence;
 
-        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
         EXPECT_CALL(*mock_socket_, Send(testing::Truly([&encoded](const std::uint8_t *const sent)
                                                        { return (0 == std::memcmp(sent, encoded, sizeof(encoded))) &&
                                                                 (0 == std::memcmp((sent + sizeof(encoded)), encoded, sizeof(encoded))); }),
-                                        sizeof(encoded) * 2U))
+                                        sizeof(encoded) * 2U, testing::_))
             .Times(2)
             .WillOnce(testing::Return(sizeof(encoded)))
             .WillOnce(testing::Return(sizeof(encoded) * 2U));
@@ -98,17 +98,17 @@ TEST_F(Serial, Receive)
 
         for (std::size_t i = 0; i < sizeof(encoded) / 2U; i++)
         {
-            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
         }
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(2).WillRepeatedly(testing::Return(0U));
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::Return(SIZE_MAX));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(2).WillRepeatedly(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
         for (std::size_t i = sizeof(encoded) / 2U; i < sizeof(encoded); i++)
         {
-            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
         }
         for (std::size_t i = 0; i < sizeof(encoded); i++)
         {
-            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(encoded[i]), testing::Return(1U)));
         }
     }
 

@@ -30,7 +30,7 @@ a_Err_t a_Serial_Send(a_Socket_t *const socket, a_Buffer_t *const data)
             (void)a_Buffer_SetRead(data, a_Buffer_GetReadSize(data));
             (void)a_Buffer_SetWrite(&socket->send_buffer, encoded);
 
-            const size_t sent = socket->functions.send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer));
+            const size_t sent = socket->functions.send(a_Buffer_GetRead(&socket->send_buffer), a_Buffer_GetReadSize(&socket->send_buffer), socket->functions.arg);
 
             if (SIZE_MAX == sent)
             {
@@ -61,7 +61,7 @@ a_Err_t a_Serial_Receive(a_Socket_t *const socket, a_Buffer_t *const data)
 
         while ((0U != byte) && (a_Buffer_GetWriteSize(&socket->receive_buffer) > 0U))
         {
-            received = socket->functions.receive(&byte, 1U);
+            received = socket->functions.receive(&byte, 1U, socket->functions.arg);
 
             if (1U == received)
             {
