@@ -70,9 +70,3 @@ a_Err_t a_Subscribe(const char *const key, void (*callback)(const char *const ke
 {
     return a_Router_Subscribe(key, callback, arg);
 }
-
-a_Err_t a_Query(void)
-{
-    /* TODO */
-    return A_ERR_MAX;
-}
