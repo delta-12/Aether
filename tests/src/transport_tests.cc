@@ -203,6 +203,21 @@ TEST(Transport, GetMessageBuffer)
     ASSERT_NE(nullptr, a_Transport_GetMessageBuffer(&message));
 }
 
+TEST(Transport, GetVersion)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetVersion(nullptr));
+    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetVersion(&message));
+
+    a_Transport_MessageConnect(&message, 1000U);
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    ASSERT_EQ(1U, a_Transport_GetVersion(&message));
+}
+
 TEST(Transport, GetMessageHeader)
 {
     a_Transport_Message_t message;

@@ -588,7 +588,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             break;
         case A_TRANSPORT_HEADER_CONNECT:
         default:
-            A_LOG_ERROR(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
+            A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
             break;
         }
     }

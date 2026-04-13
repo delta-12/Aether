@@ -24,6 +24,7 @@ a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint
     }
     else if (size >= AETHER_TRANSPORT_MTU)
     {
+        message->version         = A_TRANSPORT_VERSION_MAX;
         message->header          = A_TRANSPORT_HEADER_MAX;
         message->peer_id         = A_TRANSPORT_PEER_ID_MAX;
         message->sequence_number = A_TRANSPORT_SEQUENCE_NUMBER_MAX;
@@ -193,7 +194,10 @@ a_Err_t a_Transport_SerializeMessage(a_Transport_Message_t *const message, const
         uint8_t    serialize_data[A_TRANSPORT_SERIALIZE_BUFFER_SIZE];
         (void)a_Buffer_Initialize(&serialize_buffer, serialize_data, sizeof(serialize_data));
 
-        size_t size = Leb128_Encode64(message->header, a_Buffer_GetWrite(&serialize_buffer), a_Buffer_GetWriteSize(&serialize_buffer));
+        size_t size = Leb128_Encode8((a_Transport_Version_t)AETHER_GIT_VERSION_MAJOR, a_Buffer_GetWrite(&serialize_buffer), a_Buffer_GetWriteSize(&serialize_buffer));
+        (void)a_Buffer_SetWrite(&serialize_buffer, size);
+
+        size = Leb128_Encode64(message->header, a_Buffer_GetWrite(&serialize_buffer), a_Buffer_GetWriteSize(&serialize_buffer));
         (void)a_Buffer_SetWrite(&serialize_buffer, size);
 
         message->peer_id = peer_id;
@@ -223,7 +227,13 @@ a_Err_t a_Transport_DeserializeMessage(a_Transport_Message_t *const message)
     }
     else if (a_Buffer_GetReadSize(&message->buffer) > 0U)
     {
-        size_t size = Leb128_Decode64((uint64_t *)&message->header, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+        size_t size = Leb128_Decode8(&message->version, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+
+        if (SIZE_MAX != size)
+        {
+            (void)a_Buffer_SetRead(&message->buffer, size);
+            size = Leb128_Decode64((uint64_t *)&message->header, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+        }
 
         if (SIZE_MAX != size)
         {
@@ -321,6 +331,18 @@ a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message)
     }
 
     return buffer;
+}
+
+a_Transport_Version_t a_Transport_GetVersion(const a_Transport_Message_t *const message)
+{
+    a_Transport_Version_t version = A_TRANSPORT_VERSION_MAX;
+
+    if (NULL != message)
+    {
+        version = message->version;
+    }
+
+    return version;
 }
 
 a_Transport_Header_t a_Transport_GetMessageHeader(const a_Transport_Message_t *const message)

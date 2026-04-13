@@ -42,6 +42,9 @@ if(GIT_STATUS)
 else()
     set(GIT_DIRTY "Clean")
 endif()
+string(REGEX MATCH "^v([0-9]+)" _ ${GIT_TAG})
+set(AETHER_GIT_VERSION_MAJOR ${CMAKE_MATCH_1})
+message(STATUS "Version: ${AETHER_GIT_VERSION_MAJOR}")
 
 ################################################################################
 # Library
@@ -84,6 +87,7 @@ target_include_directories(${AETHER_TARGET}
 )
 target_compile_definitions(${AETHER_TARGET}
     PRIVATE
+        AETHER_GIT_VERSION_MAJOR=${AETHER_GIT_VERSION_MAJOR}
         $<$<BOOL:${AETHER_LOG_ENABLED}>:AETHER_LOG_ENABLED>
         $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR}>:AETHER_MEMORY_STATIC_ALLOCATOR>
         $<$<BOOL:${AETHER_TICK_USER}>:AETHER_TICK_USER>
