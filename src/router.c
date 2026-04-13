@@ -645,9 +645,18 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
 
 static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
+    /* TODO handle version mismatch and arbitrate MTU */
 
-    a_Err_t           error = A_ERR_NONE;
+    a_Err_t                 error = A_ERR_NONE;
+    const a_Transport_Mtu_t mtu   = a_Transport_GetMessageMtu(&session->message);
+
+    if (A_TRANSPORT_MTU_MAX == mtu)
+    {
+        error = A_ERR_SERIALIZATION;
+
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid MTU", id);
+    }
+
     const a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
 
     if (A_TICK_MS_MAX == lease)

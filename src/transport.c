@@ -61,9 +61,10 @@ a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a
 
         (void)a_Buffer_Clear(&message->buffer);
 
-        /* TODO encode version and MTU */
+        size_t size = Leb128_Encode16((a_Transport_Mtu_t)AETHER_TRANSPORT_MTU, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        (void)a_Buffer_SetWrite(&message->buffer, size);
 
-        size_t size = Leb128_Encode64(lease, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        size = Leb128_Encode64(lease, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
         (void)a_Buffer_SetWrite(&message->buffer, size);
 
         error = A_ERR_NONE;
@@ -74,18 +75,11 @@ a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a
 
 a_Err_t a_Transport_MessageAccept(a_Transport_Message_t *const message, const a_Tick_Ms_t lease)
 {
-    a_Err_t error = A_ERR_NULL;
+    a_Err_t error = a_Transport_MessageConnect(message, lease);
 
-    if (NULL != message)
+    if (A_ERR_NONE == error)
     {
         message->header = A_TRANSPORT_HEADER_ACCEPT;
-
-        (void)a_Buffer_Clear(&message->buffer);
-
-        size_t size = Leb128_Encode64(lease, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
-        (void)a_Buffer_SetWrite(&message->buffer, size);
-
-        error = A_ERR_NONE;
     }
 
     return error;
@@ -333,7 +327,7 @@ a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message)
     return buffer;
 }
 
-a_Transport_Version_t a_Transport_GetVersion(const a_Transport_Message_t *const message)
+a_Transport_Version_t a_Transport_GetMessageVersion(const a_Transport_Message_t *const message)
 {
     a_Transport_Version_t version = A_TRANSPORT_VERSION_MAX;
 
@@ -391,6 +385,35 @@ a_Transport_SequenceNumber_t a_Transport_GetMessageSequenceNumber(const a_Transp
     }
 
     return sequence_number;
+}
+
+a_Transport_Mtu_t a_Transport_GetMessageMtu(a_Transport_Message_t *const message)
+{
+    a_Transport_Mtu_t mtu = A_TRANSPORT_MTU_MAX;
+
+    if (NULL != message)
+    {
+        size_t size;
+        switch (message->header)
+        {
+        case A_TRANSPORT_HEADER_CONNECT:
+        case A_TRANSPORT_HEADER_ACCEPT:
+            size = Leb128_Decode16(&mtu, a_Buffer_GetRead(&message->buffer), a_Buffer_GetReadSize(&message->buffer));
+            if (SIZE_MAX != size)
+            {
+                (void)a_Buffer_SetRead(&message->buffer, size);
+            }
+            else
+            {
+                mtu = A_TRANSPORT_MTU_MAX;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    return mtu;
 }
 
 a_Tick_Ms_t a_Transport_GetMessageLease(a_Transport_Message_t *const message)

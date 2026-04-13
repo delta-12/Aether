@@ -209,13 +209,13 @@ TEST(Transport, GetVersion)
     std::uint8_t buffer[AETHER_TRANSPORT_MTU];
     a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
 
-    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetVersion(nullptr));
-    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetVersion(&message));
+    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetMessageVersion(nullptr));
+    ASSERT_EQ(A_TRANSPORT_VERSION_MAX, a_Transport_GetMessageVersion(&message));
 
     a_Transport_MessageConnect(&message, 1000U);
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
-    ASSERT_EQ(1U, a_Transport_GetVersion(&message));
+    ASSERT_EQ(1U, a_Transport_GetMessageVersion(&message));
 }
 
 TEST(Transport, GetMessageHeader)
@@ -263,6 +263,21 @@ TEST(Transport, GetMessageSequenceNumber)
     ASSERT_EQ(A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U, a_Transport_GetMessageSequenceNumber(&message));
 }
 
+TEST(Transport, GetMessageMtu)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_TRANSPORT_MTU_MAX, a_Transport_GetMessageMtu(nullptr));
+    ASSERT_EQ(A_TRANSPORT_MTU_MAX, a_Transport_GetMessageMtu(&message));
+
+    a_Transport_MessageConnect(&message, 1000U);
+    a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
+    a_Transport_DeserializeMessage(&message);
+    ASSERT_EQ(AETHER_TRANSPORT_MTU, a_Transport_GetMessageMtu(&message));
+}
+
 TEST(Transport, GetMessageLease)
 {
     a_Transport_Message_t message;
@@ -275,12 +290,14 @@ TEST(Transport, GetMessageLease)
     a_Transport_MessageConnect(&message, 1000U);
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
+    a_Transport_GetMessageMtu(&message);
     ASSERT_EQ(1000U, a_Transport_GetMessageLease(&message));
 
     a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
     a_Transport_MessageAccept(&message, 5000U);
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
+    a_Transport_GetMessageMtu(&message);
     ASSERT_EQ(5000U, a_Transport_GetMessageLease(&message));
 }
 
