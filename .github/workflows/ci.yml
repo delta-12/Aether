@@ -25,6 +25,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0
+          fetch-tags: true
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build check
@@ -51,6 +52,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0
+          fetch-tags: true
       - name: Setup
         uses: ./.github/actions/setup
       - name: Cppcheck
@@ -72,6 +74,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0
+          fetch-tags: true
       - name: Setup
         uses: ./.github/actions/setup
       - name: Crust check
@@ -98,6 +101,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0
+          fetch-tags: true
       - name: Setup
         uses: ./.github/actions/setup
       - name: Install Sonar Build Wrapper

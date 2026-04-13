@@ -19,32 +19,44 @@ execute_process(
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 execute_process(
     COMMAND git rev-parse --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 execute_process(
     COMMAND git describe --tags --always
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
+string(REGEX MATCH "^v([0-9]+)" _ "${GIT_TAG}")
+
+if(CMAKE_MATCH_1)
+    set(AETHER_GIT_VERSION_MAJOR ${CMAKE_MATCH_1})
+else()
+    set(AETHER_GIT_VERSION_MAJOR 0)
+endif()
+
+message(STATUS "Git tag: ${GIT_TAG}")
+message(STATUS "Version: ${AETHER_GIT_VERSION_MAJOR}")
+
 execute_process(
     COMMAND git status --porcelain
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_STATUS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 if(GIT_STATUS)
     set(GIT_DIRTY "Dirty")
 else()
     set(GIT_DIRTY "Clean")
 endif()
-string(REGEX MATCH "^v([0-9]+)" _ ${GIT_TAG})
-set(AETHER_GIT_VERSION_MAJOR ${CMAKE_MATCH_1})
-message(STATUS "Version: ${AETHER_GIT_VERSION_MAJOR}")
 
 ################################################################################
 # Library
