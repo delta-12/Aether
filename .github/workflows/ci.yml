@@ -27,7 +27,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
       - name: Build check
-        run: cmake --build --preset Release -j$(nproc) -t Aether
+        run: cmake --build --preset Release -j$(nproc) -t aether
       - name: Build Arduino library
         if: ${{ success() }}
         run: cmake --build --preset Release -j$(nproc) -t AetherArduino
@@ -37,7 +37,7 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            build/Release/libAether.*
+            build/Release/libaether.*
             build/Release/AetherArduino.zip
   cppcheck:
     # if: github.event_name != 'pull_request'

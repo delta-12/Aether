@@ -5,6 +5,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
+set(AETHER_TARGET aether)
 
 option(AETHER_BUILD_TESTS "Build Aether tests" OFF)
 option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
@@ -71,16 +72,17 @@ configure_file(
     ${INCLUDE_DIR}/version.h
 )
 
-add_library(${PROJECT_NAME})
-target_sources(${PROJECT_NAME}
+add_library(${AETHER_TARGET})
+add_library(Aether::Aether ALIAS ${AETHER_TARGET})
+target_sources(${AETHER_TARGET}
     PRIVATE
         ${SRCS}
 )
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${AETHER_TARGET}
     PUBLIC
         ${INCLUDE_DIR}
 )
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(${AETHER_TARGET}
     PRIVATE
         $<$<BOOL:${AETHER_LOG_ENABLED}>:AETHER_LOG_ENABLED>
         $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR}>:AETHER_MEMORY_STATIC_ALLOCATOR>
@@ -92,7 +94,7 @@ target_compile_definitions(${PROJECT_NAME}
         $<$<BOOL:${AETHER_SESSION_LEASE}>:AETHER_SESSION_LEASE=${AETHER_SESSION_LEASE}>
 )
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME}
+    target_compile_options(${AETHER_TARGET}
         PRIVATE
             -Wall -Wextra -Werror -Wpedantic -fdiagnostics-color=always
             -fPIC
@@ -104,7 +106,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
                 -fsanitize=address -fno-omit-frame-pointer
             >
     )
-    target_link_options(${PROJECT_NAME}
+    target_link_options(${AETHER_TARGET}
         PRIVATE
             $<$<CONFIG:Debug>:--coverage>
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
@@ -144,7 +146,7 @@ file(WRITE "${ARDUINO_LIB_DIR}/library.properties"
     "version=${ARUDINO_LIB_VERSION}\n"
     "author=delta-12\n"
     "maintainer=delta-12\n"
-    "sentence=Aether is a peer-to-peer communication with pub/sub and queries.\n"
+    "sentence=Aether is a pub/sub peer-to-peer communication library.\n"
     "paragraph=This is the Arduino version of Aether.\n"
     "category=Communication\n"
     "url=https://github.com/delta-12/aether\n"
