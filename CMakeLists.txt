@@ -1,16 +1,10 @@
 cmake_minimum_required(VERSION 3.30)
-project(Aether LANGUAGES C CXX)
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
-# Add global flags for other compilers here
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(Aether LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-# Add global flags for other compilers here
-endif()
 
 option(AETHER_BUILD_TESTS "Build Aether tests" OFF)
 option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
@@ -20,25 +14,25 @@ option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
 ################################################################################
 execute_process(
     COMMAND git rev-parse HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git describe --tags --always
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git status --porcelain
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_STATUS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -51,8 +45,8 @@ endif()
 ################################################################################
 # Library
 ################################################################################
-set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
+set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SRCS
     ${SRC_DIR}/aether.c
     ${SRC_DIR}/buffer.c
@@ -100,7 +94,7 @@ target_compile_definitions(${PROJECT_NAME}
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE
-            -Wall -Wextra -Werror -Wpedantic
+            -Wall -Wextra -Werror -Wpedantic -fdiagnostics-color=always
             -fPIC
             $<$<CONFIG:Debug>:-g --coverage>
             $<$<CONFIG:Debug>:
@@ -124,7 +118,7 @@ endif()
 # Arduino
 ################################################################################
 set(ARDUINO_LIB_NAME "AetherArduino")
-set(ARDUINO_LIB_DIR "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}")
+set(ARDUINO_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}")
 set(ARDUINO_SRC_DIR "${ARDUINO_LIB_DIR}/src")
 
 file(MAKE_DIRECTORY "${ARDUINO_SRC_DIR}")
@@ -162,11 +156,11 @@ add_custom_target(${ARDUINO_LIB_NAME}-lib
     DEPENDS ${ARDUINO_LIB_NAME}-copy-headers
 )
 
-set(ARDUINO_LIB_ZIP "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
+set(ARDUINO_LIB_ZIP "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
 add_custom_target(${ARDUINO_LIB_NAME}
     DEPENDS ${ARDUINO_LIB_NAME}-lib
     COMMAND ${CMAKE_COMMAND} -E tar "cf" "${ARDUINO_LIB_ZIP}" --format=zip ${ARDUINO_LIB_DIR}
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 ################################################################################
@@ -180,7 +174,7 @@ endif()
 ################################################################################
 # CI and tools
 ################################################################################
-set(TOOLS_DIR ${CMAKE_SOURCE_DIR}/tools)
+set(TOOLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 set(CPPCHECK_SOURCES ${SRCS})
 set(UNCRUSTIFY_SOURCES ${CPPCHECK_SOURCES})
 set(UNCRUSTIFY_INC_DIRS ${INCLUDE_DIR})
@@ -203,7 +197,7 @@ find_program(GCOVR_PATH gcovr
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     if(GCOVR_PATH)
         message(STATUS "Found Gcovr at: ${GCOVR_PATH}")
-        set(GCOVR_ARGS -r ${CMAKE_BINARY_DIR} -f ${INCLUDE_DIR} -f ${SRC_DIR} --exclude-throw-branches)
+        set(GCOVR_ARGS -r ${CMAKE_CURRENT_BINARY_DIR} -f ${INCLUDE_DIR} -f ${SRC_DIR} --exclude-throw-branches)
         if(DEFINED ENV{GCOV_EXECUTABLE})
             set(GCOVR_ARGS --gcov-executable $ENV{GCOV_EXECUTABLE} ${GCOVR_ARGS})
         endif()

@@ -59,6 +59,7 @@ target_include_directories(${PROJECT_NAME}
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}
         PRIVATE
+            -fdiagnostics-color=always
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
                 -fsanitize=address -fno-omit-frame-pointer -O1
             >
