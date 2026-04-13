@@ -22,7 +22,7 @@ jobs:
     needs: ci
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      tag: ${{ github.ref_name }}
+      TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -36,15 +36,15 @@ jobs:
       - name: Create pre-release
         if: ${{ contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" ./artifacts/* \
-              --title="${tag#v}" \
+          gh release create "$TAG" ./artifacts/* \
+              --title="${TAG#v}" \
               --generate-notes \
               --latest=false \
               --prerelease
       - name: Create release
         if: ${{ !contains(github.ref_name, '-') }}
         run: |
-          gh release create "$tag" ./artifacts/* \
-              --title="${tag#v}" \
+          gh release create "$TAG" ./artifacts/* \
+              --title="${TAG#v}" \
               --generate-notes \
               --latest=true
