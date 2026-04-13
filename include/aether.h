@@ -24,7 +24,6 @@ void a_Task(void);
 a_Err_t a_Declare(const char *const key);
 a_Err_t a_Publish(const char *const key, const uint8_t *const data, const size_t size);
 a_Err_t a_Subscribe(const char *const key, void (*callback)(const char *const key, const uint8_t *const data, const size_t size, void *arg), void *arg);
-a_Err_t a_Query(void);
 
 #ifdef __cplusplus
 }
