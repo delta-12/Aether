@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.30)
-project(AetherTests LANGUAGES C CXX)
 
 string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" IS_TOP_LEVEL)
 
 if(IS_TOP_LEVEL)
+    project(AetherTests LANGUAGES C CXX)
     enable_testing()
 endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(AETHER_TEST_TARGET aether_tests)
 
 ################################################################################
 # GoogleTest
@@ -30,7 +33,7 @@ endif()
 ################################################################################
 # Aether tests
 ################################################################################
-set(${PROJECT_NAME}_SRCS
+set(${AETHER_TEST_TARGET}_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/aether_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/buffer_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cobs_tests.cc
@@ -46,24 +49,25 @@ set(${PROJECT_NAME}_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tick_tests.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/transport_tests.cc
 )
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${${PROJECT_NAME}_SRCS})
-add_executable(${PROJECT_NAME})
-target_sources(${PROJECT_NAME}
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${${AETHER_TEST_TARGET}_SRCS})
+add_executable(${AETHER_TEST_TARGET})
+target_sources(${AETHER_TEST_TARGET}
     PRIVATE
-        ${${PROJECT_NAME}_SRCS}
+        ${${AETHER_TEST_TARGET}_SRCS}
 )
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${AETHER_TEST_TARGET}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME}
+    target_compile_options(${AETHER_TEST_TARGET}
         PRIVATE
+            -fdiagnostics-color=always
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
                 -fsanitize=address -fno-omit-frame-pointer -O1
             >
     )
-    target_link_options(${PROJECT_NAME}
+    target_link_options(${AETHER_TEST_TARGET}
         PRIVATE
             $<$<CONFIG:Debug>:--coverage>
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
@@ -72,18 +76,18 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     )
 # Add flags for other compilers here
 endif()
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${AETHER_TEST_TARGET}
     PUBLIC
-        Aether
+        Aether::Aether
         GTest::gtest_main
         GTest::gmock
 )
 if(AETHER_ENABLE_ASAN)
-    gtest_discover_tests(${PROJECT_NAME}
+    gtest_discover_tests(${AETHER_TEST_TARGET}
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
     )
 else()
-    gtest_discover_tests(${PROJECT_NAME})
+    gtest_discover_tests(${AETHER_TEST_TARGET})
 endif()

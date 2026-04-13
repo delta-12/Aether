@@ -1,16 +1,11 @@
 cmake_minimum_required(VERSION 3.30)
-project(Aether LANGUAGES C CXX)
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color=always")
-# Add global flags for other compilers here
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(Aether LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-# Add global flags for other compilers here
-endif()
+set(AETHER_TARGET aether)
 
 option(AETHER_BUILD_TESTS "Build Aether tests" OFF)
 option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
@@ -20,25 +15,25 @@ option(AETHER_ENABLE_ASAN "Build Aether with AddressSanitizer enabled" OFF)
 ################################################################################
 execute_process(
     COMMAND git rev-parse HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git describe --tags --always
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
     COMMAND git status --porcelain
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_STATUS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -51,8 +46,8 @@ endif()
 ################################################################################
 # Library
 ################################################################################
-set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
+set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SRCS
     ${SRC_DIR}/aether.c
     ${SRC_DIR}/buffer.c
@@ -77,16 +72,17 @@ configure_file(
     ${INCLUDE_DIR}/version.h
 )
 
-add_library(${PROJECT_NAME})
-target_sources(${PROJECT_NAME}
+add_library(${AETHER_TARGET})
+add_library(Aether::Aether ALIAS ${AETHER_TARGET})
+target_sources(${AETHER_TARGET}
     PRIVATE
         ${SRCS}
 )
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${AETHER_TARGET}
     PUBLIC
         ${INCLUDE_DIR}
 )
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(${AETHER_TARGET}
     PRIVATE
         $<$<BOOL:${AETHER_LOG_ENABLED}>:AETHER_LOG_ENABLED>
         $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR}>:AETHER_MEMORY_STATIC_ALLOCATOR>
@@ -98,9 +94,9 @@ target_compile_definitions(${PROJECT_NAME}
         $<$<BOOL:${AETHER_SESSION_LEASE}>:AETHER_SESSION_LEASE=${AETHER_SESSION_LEASE}>
 )
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME}
+    target_compile_options(${AETHER_TARGET}
         PRIVATE
-            -Wall -Wextra -Werror -Wpedantic
+            -Wall -Wextra -Werror -Wpedantic -fdiagnostics-color=always
             -fPIC
             $<$<CONFIG:Debug>:-g --coverage>
             $<$<CONFIG:Debug>:
@@ -110,7 +106,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
                 -fsanitize=address -fno-omit-frame-pointer
             >
     )
-    target_link_options(${PROJECT_NAME}
+    target_link_options(${AETHER_TARGET}
         PRIVATE
             $<$<CONFIG:Debug>:--coverage>
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_ASAN}>>:
@@ -124,7 +120,7 @@ endif()
 # Arduino
 ################################################################################
 set(ARDUINO_LIB_NAME "AetherArduino")
-set(ARDUINO_LIB_DIR "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}")
+set(ARDUINO_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}")
 set(ARDUINO_SRC_DIR "${ARDUINO_LIB_DIR}/src")
 
 file(MAKE_DIRECTORY "${ARDUINO_SRC_DIR}")
@@ -150,7 +146,7 @@ file(WRITE "${ARDUINO_LIB_DIR}/library.properties"
     "version=${ARUDINO_LIB_VERSION}\n"
     "author=delta-12\n"
     "maintainer=delta-12\n"
-    "sentence=Aether is a peer-to-peer communication with pub/sub and queries.\n"
+    "sentence=Aether is a pub/sub peer-to-peer communication library.\n"
     "paragraph=This is the Arduino version of Aether.\n"
     "category=Communication\n"
     "url=https://github.com/delta-12/aether\n"
@@ -162,17 +158,17 @@ add_custom_target(${ARDUINO_LIB_NAME}-lib
     DEPENDS ${ARDUINO_LIB_NAME}-copy-headers
 )
 
-set(ARDUINO_LIB_ZIP "${CMAKE_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
+set(ARDUINO_LIB_ZIP "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
 add_custom_target(${ARDUINO_LIB_NAME}
     DEPENDS ${ARDUINO_LIB_NAME}-lib
     COMMAND ${CMAKE_COMMAND} -E tar "cf" "${ARDUINO_LIB_ZIP}" --format=zip ${ARDUINO_LIB_DIR}
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 ################################################################################
 # Tests
 ################################################################################
-if(AETHER_BUILD_TESTS)
+if(AETHER_BUILD_TESTS AND CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
     add_subdirectory(tests)
 endif()
@@ -180,52 +176,56 @@ endif()
 ################################################################################
 # CI and tools
 ################################################################################
-set(TOOLS_DIR ${CMAKE_SOURCE_DIR}/tools)
-set(CPPCHECK_SOURCES ${SRCS})
-set(UNCRUSTIFY_SOURCES ${CPPCHECK_SOURCES})
-set(UNCRUSTIFY_INC_DIRS ${INCLUDE_DIR})
-if (CPPCHECK_SOURCES)
-    include(${TOOLS_DIR}/cppcheck/cppcheck.cmake)
-endif()
-if (CPPCHECK_SOURCES AND UNCRUSTIFY_INC_DIRS)
-    # TODO add tests to uncrustify sources
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(TOOLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+    set(CPPCHECK_SOURCES ${SRCS})
     set(UNCRUSTIFY_SOURCES ${CPPCHECK_SOURCES})
-    include(${TOOLS_DIR}/uncrustify/uncrustify.cmake)
+    set(UNCRUSTIFY_INC_DIRS ${INCLUDE_DIR})
+    if (CPPCHECK_SOURCES)
+        include(${TOOLS_DIR}/cppcheck/cppcheck.cmake)
+    endif()
+    if (CPPCHECK_SOURCES AND UNCRUSTIFY_INC_DIRS)
+        # TODO add tests to uncrustify sources
+        set(UNCRUSTIFY_SOURCES ${CPPCHECK_SOURCES})
+        include(${TOOLS_DIR}/uncrustify/uncrustify.cmake)
+    endif()
 endif()
 
 ################################################################################
 # Coverage
 ################################################################################
-find_program(GCOVR_PATH gcovr
-    HINTS "$ENV{HOME}/.local/bin"
-          "/root/.local/bin"
-)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    if(GCOVR_PATH)
-        message(STATUS "Found Gcovr at: ${GCOVR_PATH}")
-        set(GCOVR_ARGS -r ${CMAKE_BINARY_DIR} -f ${INCLUDE_DIR} -f ${SRC_DIR} --exclude-throw-branches)
-        if(DEFINED ENV{GCOV_EXECUTABLE})
-            set(GCOVR_ARGS --gcov-executable $ENV{GCOV_EXECUTABLE} ${GCOVR_ARGS})
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    find_program(GCOVR_PATH gcovr
+        HINTS "$ENV{HOME}/.local/bin"
+            "/root/.local/bin"
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        if(GCOVR_PATH)
+            message(STATUS "Found Gcovr at: ${GCOVR_PATH}")
+            set(GCOVR_ARGS -r ${CMAKE_CURRENT_BINARY_DIR} -f ${INCLUDE_DIR} -f ${SRC_DIR} --exclude-throw-branches)
+            if(DEFINED ENV{GCOV_EXECUTABLE})
+                set(GCOVR_ARGS --gcov-executable $ENV{GCOV_EXECUTABLE} ${GCOVR_ARGS})
+            endif()
+            add_custom_target(
+                coverage
+                COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --html-details --html-theme github.dark-green -o coverage.html
+                COMMENT "Generating code coverage report..."
+                DEPENDS test
+            )
+            add_custom_target(
+                coverage-no-test
+                COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --html-details --html-theme github.dark-green -o coverage.html
+                COMMENT "Generating code coverage report..."
+            )
+            add_custom_target(
+                sonarqube-coverage
+                COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --sonarqube -o coverage.xml
+                COMMENT "Generating code coverage report..."
+            )
+        else()
+            message(WARNING "Gcovr not found.")
         endif()
-        add_custom_target(
-            coverage
-            COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --html-details --html-theme github.dark-green -o coverage.html
-            COMMENT "Generating code coverage report..."
-            DEPENDS test
-        )
-        add_custom_target(
-            coverage-no-test
-            COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --html-details --html-theme github.dark-green -o coverage.html
-            COMMENT "Generating code coverage report..."
-        )
-        add_custom_target(
-            sonarqube-coverage
-            COMMAND ${GCOVR_PATH} ${GCOVR_ARGS} --sonarqube -o coverage.xml
-            COMMENT "Generating code coverage report..."
-        )
     else()
-        message(WARNING "Gcovr not found.")
+        message(WARNING "Gcovr does not support compiler.")
     endif()
-else()
-    message(WARNING "Gcovr does not support compiler.")
 endif()
