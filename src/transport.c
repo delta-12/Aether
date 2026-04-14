@@ -13,7 +13,8 @@
 
 #define A_TRANSPORT_SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(a_Transport_Version_t) + LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + \
                                            LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
-#define A_TRANSPORT_MAX_STRING_SIZE       (AETHER_TRANSPORT_MTU - (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t)))
+#define A_TRANSPORT_BUFFER_SIZE_MIN       (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(a_Transport_Mtu_t) + LEB128_MAX_SIZE(a_Tick_Ms_t))
+#define A_TRANSPORT_STRING_SIZE_MAX(mtu)  ((size_t)mtu - (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t)))
 
 a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint8_t *const buffer, const size_t size)
 {
@@ -23,9 +24,20 @@ a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint
     {
         error = A_ERR_NULL;
     }
-    else if (size >= AETHER_TRANSPORT_MTU)
+    else if (size < A_TRANSPORT_BUFFER_SIZE_MIN)
     {
-        error = a_Buffer_Initialize(&message->buffer, buffer, AETHER_TRANSPORT_MTU);
+        error = A_ERR_SIZE;
+    }
+    else
+    {
+        size_t mtu = size;
+
+        if (mtu > AETHER_TRANSPORT_MTU)
+        {
+            mtu = AETHER_TRANSPORT_MTU;
+        }
+
+        error = a_Buffer_Initialize(&message->buffer, buffer, mtu);
 
         a_Transport_MessageReset(message);
     }
@@ -58,7 +70,8 @@ a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a
 
         (void)a_Buffer_Clear(&message->buffer);
 
-        size_t size = Leb128_Encode16(AETHER_TRANSPORT_MTU, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        const size_t buffer_size = a_Buffer_GetWriteSize(&message->buffer);
+        size_t       size        = Leb128_Encode16(buffer_size, a_Buffer_GetWrite(&message->buffer), buffer_size);
         (void)a_Buffer_SetWrite(&message->buffer, size);
 
         size = Leb128_Encode64(lease, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
@@ -122,23 +135,31 @@ a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const c
     {
         error = A_ERR_NULL;
     }
-    else if ((0U == data_size) || (data_size > A_TRANSPORT_MAX_STRING_SIZE))
+    else if (0U == data_size)
     {
         error = A_ERR_SIZE;
     }
     else
     {
-        const uint64_t key_hash = a_Hash_String(key, A_TRANSPORT_MAX_STRING_SIZE);
-
-        message->header = A_TRANSPORT_HEADER_PUBLISH;
-
         (void)a_Buffer_Clear(&message->buffer);
 
-        size_t size = Leb128_Encode64(key_hash, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
-        (void)a_Buffer_SetWrite(&message->buffer, size);
+        size_t         size     = A_TRANSPORT_STRING_SIZE_MAX(a_Buffer_GetWriteSize(&message->buffer));
+        const uint64_t key_hash = a_Hash_String(key, size);
 
-        memcpy(a_Buffer_GetWrite(&message->buffer), data, data_size);
-        (void)a_Buffer_SetWrite(&message->buffer, data_size);
+        if (data_size > size)
+        {
+            error = A_ERR_SIZE;
+        }
+        else
+        {
+            message->header = A_TRANSPORT_HEADER_PUBLISH;
+
+            size = Leb128_Encode64(key_hash, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+            (void)a_Buffer_SetWrite(&message->buffer, size);
+
+            memcpy(a_Buffer_GetWrite(&message->buffer), data, data_size);
+            (void)a_Buffer_SetWrite(&message->buffer, data_size);
+        }
     }
 
     return error;
@@ -150,17 +171,17 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
 
     if ((NULL != message) && (NULL != key))
     {
+        (void)a_Buffer_Clear(&message->buffer);
+
         const uint64_t key_size = a_Transport_GetStringSize(key);
 
-        if (key_size > A_TRANSPORT_MAX_STRING_SIZE)
+        if (key_size > A_TRANSPORT_STRING_SIZE_MAX(a_Buffer_GetWriteSize(&message->buffer)))
         {
             error = A_ERR_SIZE;
         }
         else
         {
             message->header = A_TRANSPORT_HEADER_SUBSCRIBE;
-
-            (void)a_Buffer_Clear(&message->buffer);
 
             size_t size = Leb128_Encode64(key_size, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
             (void)a_Buffer_SetWrite(&message->buffer, size);
@@ -306,7 +327,7 @@ size_t a_Transport_GetStringSize(const char *const string)
 
     if (NULL != string)
     {
-        size = strnlen(string, A_TRANSPORT_MAX_STRING_SIZE - 1U) + 1U;
+        size = strnlen(string, A_TRANSPORT_STRING_SIZE_MAX(AETHER_TRANSPORT_MTU) - 1U) + 1U;
     }
 
     return size;

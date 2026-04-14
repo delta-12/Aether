@@ -6,9 +6,13 @@
 
 #include "err.h"
 #include "hash.h"
+#include "leb128.h"
 #include "transport.h"
 
 #define SPAN_FROM_VALUE(value, size) std::span<std::uint8_t>(static_cast<std::uint8_t *>(value), size)
+#define SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(a_Transport_Version_t) + LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + \
+                               LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
+#define BUFFER_SIZE_MIN (SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(a_Transport_Mtu_t) + LEB128_MAX_SIZE(a_Tick_Ms_t))
 
 TEST(Transport, MessageInitialize)
 {
@@ -18,9 +22,11 @@ TEST(Transport, MessageInitialize)
     ASSERT_EQ(A_ERR_NULL, a_Transport_MessageInitialize(nullptr, buffer, sizeof(buffer)));
     ASSERT_EQ(A_ERR_NULL, a_Transport_MessageInitialize(&message, nullptr, sizeof(buffer)));
 
-    ASSERT_EQ(A_ERR_SIZE, a_Transport_MessageInitialize(&message, buffer, sizeof(buffer) - 1U));
+    ASSERT_EQ(A_ERR_SIZE, a_Transport_MessageInitialize(&message, buffer, BUFFER_SIZE_MIN - 1U));
 
+    ASSERT_EQ(A_ERR_NONE, a_Transport_MessageInitialize(&message, buffer, sizeof(buffer) - 1U));
     ASSERT_EQ(A_ERR_NONE, a_Transport_MessageInitialize(&message, buffer, sizeof(buffer)));
+    ASSERT_EQ(A_ERR_NONE, a_Transport_MessageInitialize(&message, buffer, sizeof(buffer) + 1U));
 }
 
 TEST(Transport, MessageConnect)
@@ -70,8 +76,8 @@ TEST(Transport, MessageRenew)
 TEST(Transport, MessagePublish)
 {
     a_Transport_Message_t message;
-    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
     std::uint8_t data[] = {0x00U, 0x01, 0x02, 0x03};
+    std::uint8_t buffer[SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t) + sizeof(data)];
     a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
 
     ASSERT_EQ(A_ERR_NULL, a_Transport_MessagePublish(nullptr, "/foo/bar", data, sizeof(data)));
@@ -79,6 +85,7 @@ TEST(Transport, MessagePublish)
     ASSERT_EQ(A_ERR_NULL, a_Transport_MessagePublish(&message, "/foo/bar", nullptr, sizeof(data)));
 
     ASSERT_EQ(A_ERR_SIZE, a_Transport_MessagePublish(&message, "/foo/bar", data, 0U));
+    ASSERT_EQ(A_ERR_SIZE, a_Transport_MessagePublish(&message, "/foo/bar", data, sizeof(data) + 1U));
 
     ASSERT_EQ(A_ERR_NONE, a_Transport_MessagePublish(&message, "/foo/bar", data, sizeof(data)));
 }
@@ -86,10 +93,13 @@ TEST(Transport, MessagePublish)
 TEST(Transport, MessageSubscribe)
 {
     a_Transport_Message_t message;
-    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    std::uint8_t buffer[SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t) + 9U];
     a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
 
     ASSERT_EQ(A_ERR_NULL, a_Transport_MessageSubscribe(nullptr, "/foo/bar"));
+    ASSERT_EQ(A_ERR_NULL, a_Transport_MessageSubscribe(&message, nullptr));
+
+    ASSERT_EQ(A_ERR_SIZE, a_Transport_MessageSubscribe(&message, "/foo/bar/"));
 
     ASSERT_EQ(A_ERR_NONE, a_Transport_MessageSubscribe(&message, "/foo/bar"));
 }
