@@ -46,7 +46,7 @@ message(STATUS "Git tag: ${GIT_TAG}")
 message(STATUS "Version: ${AETHER_GIT_VERSION_MAJOR}")
 
 execute_process(
-    COMMAND git status --porcelain
+    COMMAND git status --porcelain --untracked-files=no
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_STATUS
     OUTPUT_STRIP_TRAILING_WHITESPACE
