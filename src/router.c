@@ -643,10 +643,11 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
 
 static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    /* TODO handle version mismatch and arbitrate MTU */
+    /* TODO handle version mismatch */
 
     a_Err_t                 error = A_ERR_NONE;
     const a_Transport_Mtu_t mtu   = a_Transport_GetMessageMtu(&session->message);
+    const a_Tick_Ms_t       lease = a_Transport_GetMessageLease(&session->message);
 
     if (A_TRANSPORT_MTU_MAX == mtu)
     {
@@ -654,8 +655,14 @@ static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t
 
         A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid MTU", id);
     }
+    else if (mtu < a_Transport_GetMtu(&session->message))
+    {
+        a_Buffer_t *const buffer = a_Transport_GetMessageBuffer(&session->message);
 
-    const a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
+        (void)a_Buffer_Clear(buffer);
+
+        error = a_Transport_MessageInitialize(&session->message, a_Buffer_GetWrite(buffer), mtu);
+    }
 
     if (A_TICK_MS_MAX == lease)
     {

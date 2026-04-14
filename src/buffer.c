@@ -83,6 +83,18 @@ a_Err_t a_Buffer_SetRead(a_Buffer_t *const buffer, const size_t read)
     return error;
 }
 
+size_t a_Buffer_GetCapacity(const a_Buffer_t *const buffer)
+{
+    size_t capacity = SIZE_MAX;
+
+    if (NULL != buffer)
+    {
+        capacity = buffer->size;
+    }
+
+    return capacity;
+}
+
 uint8_t *a_Buffer_GetWrite(const a_Buffer_t *const buffer)
 {
     uint8_t *write = NULL;
