@@ -62,6 +62,7 @@ endif()
 # Library
 ################################################################################
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SRCS
     ${SRC_DIR}/aether.c
@@ -84,7 +85,7 @@ set(SRCS
 
 configure_file(
     ${INCLUDE_DIR}/version.h.in
-    ${INCLUDE_DIR}/version.h
+    ${GENERATED_INCLUDE_DIR}/version.h
 )
 
 add_library(${AETHER_TARGET})
@@ -96,6 +97,7 @@ target_sources(${AETHER_TARGET}
 target_include_directories(${AETHER_TARGET}
     PUBLIC
         ${INCLUDE_DIR}
+        ${GENERATED_INCLUDE_DIR}
 )
 target_compile_definitions(${AETHER_TARGET}
     PRIVATE
