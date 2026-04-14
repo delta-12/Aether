@@ -52,7 +52,7 @@ typedef struct
     a_Router_Deletion_t deletion;
     bool retain;
     bool accept_sent;
-}a_Router_Session_t;
+} a_Router_Session_t;
 
 struct a_Router_SubscriberSession
 {
@@ -301,7 +301,7 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
                 {
                     (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
 
-                    send_error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+                    send_error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
                 }
 
                 if (A_ERR_NONE != send_error)
@@ -376,7 +376,7 @@ static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Rout
 {
     a_Router_SerializeMessage(&session->message);
 
-    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
 
     if (A_ERR_NONE != error)
     {
@@ -390,7 +390,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 {
     a_Transport_MessageReset(&session->message);
 
-    a_Buffer_t *const buffer = a_Transport_GetMessageBuffer(&session->message);
+    a_Buffer_t *const buffer = a_Transport_GetBuffer(&session->message);
     a_Err_t           error  = a_Socket_Receive(&session->socket, buffer);
 
     if ((A_ERR_NONE == error) && (a_Buffer_GetReadSize(buffer) > 0U))
@@ -657,7 +657,7 @@ static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t
     }
     else if (mtu < a_Transport_GetMtu(&session->message))
     {
-        a_Buffer_t *const buffer = a_Transport_GetMessageBuffer(&session->message);
+        a_Buffer_t *const buffer = a_Transport_GetBuffer(&session->message);
 
         (void)a_Buffer_Clear(buffer);
 
@@ -711,7 +711,7 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
         {
             (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)
@@ -802,7 +802,7 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
                 {
                     (void)a_Transport_SerializeMessage(&forward_session->message, peer_id, sequence_number);
 
-                    send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetMessageBuffer(&forward_session->message));
+                    send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetBuffer(&forward_session->message));
                 }
 
                 if (A_ERR_NONE != send_error)
@@ -903,7 +903,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
         {
             (void)a_Transport_SerializeMessage(&session->message, peer_id, sequence_number);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)
@@ -934,7 +934,7 @@ static void a_Router_SessionSendSubscriptionsCallback(const void *const key, con
         {
             a_Router_SerializeMessage(&session->message);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)

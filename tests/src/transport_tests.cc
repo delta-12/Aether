@@ -208,9 +208,9 @@ TEST(Transport, GetMessageBuffer)
     std::uint8_t buffer[AETHER_TRANSPORT_MTU];
     a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
 
-    ASSERT_EQ(nullptr, a_Transport_GetMessageBuffer(nullptr));
+    ASSERT_EQ(nullptr, a_Transport_GetBuffer(nullptr));
 
-    ASSERT_NE(nullptr, a_Transport_GetMessageBuffer(&message));
+    ASSERT_NE(nullptr, a_Transport_GetBuffer(&message));
 }
 
 TEST(Transport, GetMtu)

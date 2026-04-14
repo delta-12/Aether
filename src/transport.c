@@ -333,7 +333,7 @@ size_t a_Transport_GetStringSize(const char *const string)
     return size;
 }
 
-a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message)
+a_Buffer_t *a_Transport_GetBuffer(a_Transport_Message_t *const message)
 {
     a_Buffer_t *buffer = NULL;
 

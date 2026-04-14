@@ -67,7 +67,7 @@ void a_Transport_CopyString(char *const copy, const char *const string, const si
 bool a_Transport_IsMessageSerialized(const a_Transport_Message_t *const message);
 bool a_Transport_IsMessageDeserialized(const a_Transport_Message_t *const message);
 size_t a_Transport_GetStringSize(const char *const string);
-a_Buffer_t *a_Transport_GetMessageBuffer(a_Transport_Message_t *const message);   /* TODO rename */
+a_Buffer_t *a_Transport_GetBuffer(a_Transport_Message_t *const message);
 a_Transport_Mtu_t a_Transport_GetMtu(const a_Transport_Message_t *const message);
 a_Transport_Version_t a_Transport_GetMessageVersion(const a_Transport_Message_t *const message);
 a_Transport_Header_t a_Transport_GetMessageHeader(const a_Transport_Message_t *const message);
