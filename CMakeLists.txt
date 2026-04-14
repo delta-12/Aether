@@ -83,9 +83,11 @@ set(SRCS
     ${SRC_DIR}/transport.c
 )
 
+set(GENERATED_VERSION_HEADER ${GENERATED_INCLUDE_DIR}/version.h)
 configure_file(
     ${INCLUDE_DIR}/version.h.in
-    ${GENERATED_INCLUDE_DIR}/version.h
+    ${GENERATED_VERSION_HEADER}
+    @ONLY
 )
 
 add_library(${AETHER_TARGET})
@@ -144,14 +146,23 @@ set(ARDUINO_SRC_DIR "${ARDUINO_LIB_DIR}/src")
 file(MAKE_DIRECTORY "${ARDUINO_SRC_DIR}")
 file(MAKE_DIRECTORY "${ARDUINO_EXAMPLES_DIR}")
 
-foreach(f ${SRCS})
-    configure_file(${f} ${ARDUINO_SRC_DIR} COPYONLY)
-endforeach()
+set(ARDUINO_COPY_SOURCES ${ARDUINO_LIB_NAME}-copy-sources)
+add_custom_command(
+    OUTPUT ${ARDUINO_COPY_SOURCES}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SRC_DIR} ${ARDUINO_SRC_DIR}
+)
 
-add_custom_target(${ARDUINO_LIB_NAME}-copy-headers
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${INCLUDE_DIR}
-            ${ARDUINO_SRC_DIR}
+set(ARDUINO_COPY_HEADERS ${ARDUINO_LIB_NAME}-copy-headers)
+add_custom_command(
+    OUTPUT ${ARDUINO_COPY_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${INCLUDE_DIR} ${ARDUINO_SRC_DIR}
+)
+
+set(ARDUINO_VERSION_HEADER ${ARDUINO_SRC_DIR}/version.h)
+add_custom_command(
+    OUTPUT ${ARDUINO_VERSION_HEADER}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_VERSION_HEADER} ${ARDUINO_VERSION_HEADER}
+    DEPENDS ${GENERATED_VERSION_HEADER}
 )
 
 string(REGEX REPLACE "^v" "" ARUDINO_LIB_VERSION "${GIT_TAG}")
@@ -159,27 +170,16 @@ string(REGEX REPLACE "-.*$" "" ARUDINO_LIB_VERSION "${ARUDINO_LIB_VERSION}")
 if(NOT ARUDINO_LIB_VERSION)
     set(ARUDINO_LIB_VERSION "0.0.0")
 endif()
-file(WRITE "${ARDUINO_LIB_DIR}/library.properties"
-    "name=${ARDUINO_LIB_NAME}\n"
-    "version=${ARUDINO_LIB_VERSION}\n"
-    "author=delta-12\n"
-    "maintainer=delta-12\n"
-    "sentence=Aether is a pub/sub peer-to-peer communication library.\n"
-    "paragraph=This is the Arduino version of Aether.\n"
-    "category=Communication\n"
-    "url=https://github.com/delta-12/aether\n"
-    "architectures=*\n"
-)
-
-add_custom_target(${ARDUINO_LIB_NAME}-lib
-    COMMENT "Generating Arduino library structure at ${ARDUINO_LIB_DIR}"
-    DEPENDS ${ARDUINO_LIB_NAME}-copy-headers
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/library.properties.in
+    ${ARDUINO_LIB_DIR}/library.properties
+    @ONLY
 )
 
 set(ARDUINO_LIB_ZIP "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
 add_custom_target(${ARDUINO_LIB_NAME}
-    DEPENDS ${ARDUINO_LIB_NAME}-lib
     COMMAND ${CMAKE_COMMAND} -E tar "cf" "${ARDUINO_LIB_ZIP}" --format=zip ${ARDUINO_LIB_DIR}
+    DEPENDS ${ARDUINO_COPY_SOURCES} ${ARDUINO_COPY_HEADERS} ${ARDUINO_VERSION_HEADER}
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
