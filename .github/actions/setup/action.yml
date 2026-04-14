@@ -2,6 +2,9 @@ name: Setup
 runs:
   using: "composite"
   steps:
+    - name: Mark Repo as Safe
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      shell: sh
     - name: Cache CMake files
       id: cache-cmake
       uses: actions/cache@v5

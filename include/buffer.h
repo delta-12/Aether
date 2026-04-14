@@ -23,6 +23,7 @@ a_Err_t a_Buffer_Initialize(a_Buffer_t *const buffer, uint8_t *const data, const
 a_Err_t a_Buffer_Clear(a_Buffer_t *const buffer);
 a_Err_t a_Buffer_SetWrite(a_Buffer_t *const buffer, const size_t written);
 a_Err_t a_Buffer_SetRead(a_Buffer_t *const buffer, const size_t read);
+size_t a_Buffer_GetCapacity(const a_Buffer_t *const buffer);
 uint8_t *a_Buffer_GetWrite(const a_Buffer_t *const buffer);
 uint8_t *a_Buffer_GetRead(const a_Buffer_t *const buffer);
 size_t a_Buffer_GetWriteSize(const a_Buffer_t *const buffer);

@@ -9,7 +9,7 @@ CMakeUserPresets.json
 _*
 
 # Version header
-include/version.h
+version.h
 
 # VS Code
 .vscode/*

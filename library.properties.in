@@ -1,0 +1,9 @@
+name=@ARDUINO_LIB_NAME@
+version=@ARUDINO_LIB_VERSION@
+author=delta-12
+maintainer=delta-12
+sentence=Aether is a pub/sub peer-to-peer communication library.
+paragraph=This is the Arduino version of Aether.
+category=Communication
+url=https://github.com/delta-12/aether
+architectures=*

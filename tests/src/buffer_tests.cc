@@ -70,6 +70,18 @@ TEST(Buffer, SetRead)
     ASSERT_EQ(A_ERR_SIZE, a_Buffer_SetRead(&buffer, 5U));
 }
 
+TEST(Buffer, GetCapacity)
+{
+    a_Buffer_t buffer;
+    std::uint8_t data[4U];
+
+    a_Buffer_Initialize(&buffer, data, sizeof(data));
+
+    ASSERT_EQ(SIZE_MAX, a_Buffer_GetCapacity(nullptr));
+
+    ASSERT_EQ(sizeof(data), a_Buffer_GetCapacity(&buffer));
+}
+
 TEST(Buffer, GetWrite)
 {
     a_Buffer_t buffer;

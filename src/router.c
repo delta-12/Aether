@@ -52,7 +52,7 @@ typedef struct
     a_Router_Deletion_t deletion;
     bool retain;
     bool accept_sent;
-}a_Router_Session_t;
+} a_Router_Session_t;
 
 struct a_Router_SubscriberSession
 {
@@ -301,7 +301,7 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
                 {
                     (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
 
-                    send_error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+                    send_error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
                 }
 
                 if (A_ERR_NONE != send_error)
@@ -376,7 +376,7 @@ static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Rout
 {
     a_Router_SerializeMessage(&session->message);
 
-    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+    a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
 
     if (A_ERR_NONE != error)
     {
@@ -390,7 +390,7 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 {
     a_Transport_MessageReset(&session->message);
 
-    a_Buffer_t *const buffer = a_Transport_GetMessageBuffer(&session->message);
+    a_Buffer_t *const buffer = a_Transport_GetBuffer(&session->message);
     a_Err_t           error  = a_Socket_Receive(&session->socket, buffer);
 
     if ((A_ERR_NONE == error) && (a_Buffer_GetReadSize(buffer) > 0U))
@@ -506,38 +506,36 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             session->retries++;
             session->last_renew_received = tick;
         }
+
+        error = a_Router_SessionMessageReceive(id, session);
+
+        if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
+        {
+            /* Error receiving message or no message received */
+        }
+        else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
+        {
+            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+            session->last_renew_received = tick;
+        }
+        else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
+        {
+            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+            session->last_renew_received = tick;
+
+            if (session->accept_sent)
+            {
+                session->last_renew_sent = tick;
+                session->state           = A_ROUTER_SESSION_STATE_OPEN;
+
+                a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
+
+                A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+            }
+        }
         else
         {
-            error = a_Router_SessionMessageReceive(id, session);
-
-            if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
-            {
-                /* Error receiving message or no message received */
-            }
-            else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
-            {
-                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-                session->last_renew_received = tick;
-            }
-            else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
-            {
-                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-                session->last_renew_received = tick;
-
-                if (session->accept_sent)
-                {
-                    session->last_renew_sent = tick;
-                    session->state           = A_ROUTER_SESSION_STATE_OPEN;
-
-                    a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
-
-                    A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
-                }
-            }
-            else
-            {
-                error = A_ERR_SEQUENCE;
-            }
+            error = A_ERR_SEQUENCE;
         }
     }
     else
@@ -588,7 +586,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             break;
         case A_TRANSPORT_HEADER_CONNECT:
         default:
-            A_LOG_ERROR(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
+            A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
             break;
         }
     }
@@ -645,10 +643,26 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
 
 static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    /* TODO handle version mismatch and arbitrate MTU, make sure to get fields in correct order */
+    /* TODO handle version mismatch */
 
-    a_Err_t           error = A_ERR_NONE;
-    const a_Tick_Ms_t lease = a_Transport_GetMessageLease(&session->message);
+    a_Err_t                 error = A_ERR_NONE;
+    const a_Transport_Mtu_t mtu   = a_Transport_GetMessageMtu(&session->message);
+    const a_Tick_Ms_t       lease = a_Transport_GetMessageLease(&session->message);
+
+    if (A_TRANSPORT_MTU_MAX == mtu)
+    {
+        error = A_ERR_SERIALIZATION;
+
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid MTU", id);
+    }
+    else if (mtu < a_Transport_GetMtu(&session->message))
+    {
+        a_Buffer_t *const buffer = a_Transport_GetBuffer(&session->message);
+
+        (void)a_Buffer_Clear(buffer);
+
+        error = a_Transport_MessageInitialize(&session->message, a_Buffer_GetWrite(buffer), mtu);
+    }
 
     if (A_TICK_MS_MAX == lease)
     {
@@ -697,7 +711,7 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
         {
             (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)
@@ -788,7 +802,7 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
                 {
                     (void)a_Transport_SerializeMessage(&forward_session->message, peer_id, sequence_number);
 
-                    send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetMessageBuffer(&forward_session->message));
+                    send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetBuffer(&forward_session->message));
                 }
 
                 if (A_ERR_NONE != send_error)
@@ -889,7 +903,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
         {
             (void)a_Transport_SerializeMessage(&session->message, peer_id, sequence_number);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)
@@ -920,7 +934,7 @@ static void a_Router_SessionSendSubscriptionsCallback(const void *const key, con
         {
             a_Router_SerializeMessage(&session->message);
 
-            error = a_Socket_Send(&session->socket, a_Transport_GetMessageBuffer(&session->message));
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }
 
         if (A_ERR_NONE != error)

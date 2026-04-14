@@ -19,24 +19,39 @@ execute_process(
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 execute_process(
     COMMAND git rev-parse --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 execute_process(
     COMMAND git describe --tags --always
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
+string(REGEX MATCH "^v([0-9]+)" _ "${GIT_TAG}")
+
+if(CMAKE_MATCH_1)
+    set(AETHER_GIT_VERSION_MAJOR ${CMAKE_MATCH_1})
+else()
+    set(AETHER_GIT_VERSION_MAJOR 0)
+endif()
+
+message(STATUS "Git tag: ${GIT_TAG}")
+message(STATUS "Version: ${AETHER_GIT_VERSION_MAJOR}")
+
 execute_process(
-    COMMAND git status --porcelain
+    COMMAND git status --porcelain --untracked-files=no
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_STATUS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
 if(GIT_STATUS)
     set(GIT_DIRTY "Dirty")
 else()
@@ -47,6 +62,7 @@ endif()
 # Library
 ################################################################################
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SRCS
     ${SRC_DIR}/aether.c
@@ -67,9 +83,11 @@ set(SRCS
     ${SRC_DIR}/transport.c
 )
 
+set(GENERATED_VERSION_HEADER ${GENERATED_INCLUDE_DIR}/version.h)
 configure_file(
     ${INCLUDE_DIR}/version.h.in
-    ${INCLUDE_DIR}/version.h
+    ${GENERATED_VERSION_HEADER}
+    @ONLY
 )
 
 add_library(${AETHER_TARGET})
@@ -81,9 +99,11 @@ target_sources(${AETHER_TARGET}
 target_include_directories(${AETHER_TARGET}
     PUBLIC
         ${INCLUDE_DIR}
+        ${GENERATED_INCLUDE_DIR}
 )
 target_compile_definitions(${AETHER_TARGET}
     PRIVATE
+        AETHER_GIT_VERSION_MAJOR=${AETHER_GIT_VERSION_MAJOR}
         $<$<BOOL:${AETHER_LOG_ENABLED}>:AETHER_LOG_ENABLED>
         $<$<BOOL:${AETHER_MEMORY_STATIC_ALLOCATOR}>:AETHER_MEMORY_STATIC_ALLOCATOR>
         $<$<BOOL:${AETHER_TICK_USER}>:AETHER_TICK_USER>
@@ -126,14 +146,23 @@ set(ARDUINO_SRC_DIR "${ARDUINO_LIB_DIR}/src")
 file(MAKE_DIRECTORY "${ARDUINO_SRC_DIR}")
 file(MAKE_DIRECTORY "${ARDUINO_EXAMPLES_DIR}")
 
-foreach(f ${SRCS})
-    configure_file(${f} ${ARDUINO_SRC_DIR} COPYONLY)
-endforeach()
+set(ARDUINO_COPY_SOURCES ${ARDUINO_LIB_NAME}-copy-sources)
+add_custom_command(
+    OUTPUT ${ARDUINO_COPY_SOURCES}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SRC_DIR} ${ARDUINO_SRC_DIR}
+)
 
-add_custom_target(${ARDUINO_LIB_NAME}-copy-headers
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${INCLUDE_DIR}
-            ${ARDUINO_SRC_DIR}
+set(ARDUINO_COPY_HEADERS ${ARDUINO_LIB_NAME}-copy-headers)
+add_custom_command(
+    OUTPUT ${ARDUINO_COPY_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${INCLUDE_DIR} ${ARDUINO_SRC_DIR}
+)
+
+set(ARDUINO_VERSION_HEADER ${ARDUINO_SRC_DIR}/version.h)
+add_custom_command(
+    OUTPUT ${ARDUINO_VERSION_HEADER}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_VERSION_HEADER} ${ARDUINO_VERSION_HEADER}
+    DEPENDS ${GENERATED_VERSION_HEADER}
 )
 
 string(REGEX REPLACE "^v" "" ARUDINO_LIB_VERSION "${GIT_TAG}")
@@ -141,27 +170,16 @@ string(REGEX REPLACE "-.*$" "" ARUDINO_LIB_VERSION "${ARUDINO_LIB_VERSION}")
 if(NOT ARUDINO_LIB_VERSION)
     set(ARUDINO_LIB_VERSION "0.0.0")
 endif()
-file(WRITE "${ARDUINO_LIB_DIR}/library.properties"
-    "name=${ARDUINO_LIB_NAME}\n"
-    "version=${ARUDINO_LIB_VERSION}\n"
-    "author=delta-12\n"
-    "maintainer=delta-12\n"
-    "sentence=Aether is a pub/sub peer-to-peer communication library.\n"
-    "paragraph=This is the Arduino version of Aether.\n"
-    "category=Communication\n"
-    "url=https://github.com/delta-12/aether\n"
-    "architectures=*\n"
-)
-
-add_custom_target(${ARDUINO_LIB_NAME}-lib
-    COMMENT "Generating Arduino library structure at ${ARDUINO_LIB_DIR}"
-    DEPENDS ${ARDUINO_LIB_NAME}-copy-headers
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/library.properties.in
+    ${ARDUINO_LIB_DIR}/library.properties
+    @ONLY
 )
 
 set(ARDUINO_LIB_ZIP "${CMAKE_CURRENT_BINARY_DIR}/${ARDUINO_LIB_NAME}.zip")
 add_custom_target(${ARDUINO_LIB_NAME}
-    DEPENDS ${ARDUINO_LIB_NAME}-lib
     COMMAND ${CMAKE_COMMAND} -E tar "cf" "${ARDUINO_LIB_ZIP}" --format=zip ${ARDUINO_LIB_DIR}
+    DEPENDS ${ARDUINO_COPY_SOURCES} ${ARDUINO_COPY_HEADERS} ${ARDUINO_VERSION_HEADER}
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
