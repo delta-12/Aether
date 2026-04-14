@@ -143,7 +143,7 @@ a_Err_t a_Transport_MessagePublish(a_Transport_Message_t *const message, const c
     {
         (void)a_Buffer_Clear(&message->buffer);
 
-        size_t         size     = A_TRANSPORT_STRING_SIZE_MAX(a_Buffer_GetWriteSize(&message->buffer));
+        size_t         size     = A_TRANSPORT_STRING_SIZE_MAX(a_Transport_GetMtu(message));
         const uint64_t key_hash = a_Hash_String(key, size);
 
         if (data_size > size)
@@ -175,7 +175,7 @@ a_Err_t a_Transport_MessageSubscribe(a_Transport_Message_t *const message, const
 
         const uint64_t key_size = a_Transport_GetStringSize(key);
 
-        if (key_size > A_TRANSPORT_STRING_SIZE_MAX(a_Buffer_GetWriteSize(&message->buffer)))
+        if (key_size > A_TRANSPORT_STRING_SIZE_MAX(a_Transport_GetMtu(message)))
         {
             error = A_ERR_SIZE;
         }

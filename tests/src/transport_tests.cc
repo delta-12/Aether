@@ -213,6 +213,17 @@ TEST(Transport, GetMessageBuffer)
     ASSERT_NE(nullptr, a_Transport_GetMessageBuffer(&message));
 }
 
+TEST(Transport, GetMtu)
+{
+    a_Transport_Message_t message;
+    std::uint8_t buffer[AETHER_TRANSPORT_MTU];
+    a_Transport_MessageInitialize(&message, buffer, sizeof(buffer));
+
+    ASSERT_EQ(A_TRANSPORT_MTU_MAX, a_Transport_GetMtu(nullptr));
+
+    ASSERT_EQ(sizeof(buffer), a_Transport_GetMtu(&message));
+}
+
 TEST(Transport, GetVersion)
 {
     a_Transport_Message_t message;
