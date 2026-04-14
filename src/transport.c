@@ -11,7 +11,8 @@
 #include "leb128.h"
 #include "tick.h"
 
-#define A_TRANSPORT_SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
+#define A_TRANSPORT_SERIALIZE_BUFFER_SIZE (LEB128_MAX_SIZE(a_Transport_Version_t) + LEB128_MAX_SIZE(uint64_t) + LEB128_MAX_SIZE(a_Transport_PeerId_t) + \
+                                           LEB128_MAX_SIZE(a_Transport_SequenceNumber_t))
 #define A_TRANSPORT_MAX_STRING_SIZE       (AETHER_TRANSPORT_MTU - (A_TRANSPORT_SERIALIZE_BUFFER_SIZE + LEB128_MAX_SIZE(uint64_t)))
 
 a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint8_t *const buffer, const size_t size)
