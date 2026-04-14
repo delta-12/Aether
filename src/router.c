@@ -506,38 +506,36 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
             session->retries++;
             session->last_renew_received = tick;
         }
+
+        error = a_Router_SessionMessageReceive(id, session);
+
+        if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
+        {
+            /* Error receiving message or no message received */
+        }
+        else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
+        {
+            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+            session->last_renew_received = tick;
+        }
+        else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
+        {
+            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+            session->last_renew_received = tick;
+
+            if (session->accept_sent)
+            {
+                session->last_renew_sent = tick;
+                session->state           = A_ROUTER_SESSION_STATE_OPEN;
+
+                a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
+
+                A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+            }
+        }
         else
         {
-            error = a_Router_SessionMessageReceive(id, session);
-
-            if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
-            {
-                /* Error receiving message or no message received */
-            }
-            else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
-            {
-                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-                session->last_renew_received = tick;
-            }
-            else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
-            {
-                error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-                session->last_renew_received = tick;
-
-                if (session->accept_sent)
-                {
-                    session->last_renew_sent = tick;
-                    session->state           = A_ROUTER_SESSION_STATE_OPEN;
-
-                    a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
-
-                    A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
-                }
-            }
-            else
-            {
-                error = A_ERR_SEQUENCE;
-            }
+            error = A_ERR_SEQUENCE;
         }
     }
     else
