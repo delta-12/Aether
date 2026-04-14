@@ -25,14 +25,9 @@ a_Err_t a_Transport_MessageInitialize(a_Transport_Message_t *const message, uint
     }
     else if (size >= AETHER_TRANSPORT_MTU)
     {
-        message->version         = A_TRANSPORT_VERSION_MAX;
-        message->header          = A_TRANSPORT_HEADER_MAX;
-        message->peer_id         = A_TRANSPORT_PEER_ID_MAX;
-        message->sequence_number = A_TRANSPORT_SEQUENCE_NUMBER_MAX;
-        message->serialized      = false;
-        message->deserialized    = false;
-
         error = a_Buffer_Initialize(&message->buffer, buffer, AETHER_TRANSPORT_MTU);
+
+        a_Transport_MessageReset(message);
     }
 
     return error;
@@ -42,6 +37,7 @@ void a_Transport_MessageReset(a_Transport_Message_t *const message)
 {
     if (NULL != message)
     {
+        message->version         = A_TRANSPORT_VERSION_MAX;
         message->header          = A_TRANSPORT_HEADER_MAX;
         message->peer_id         = A_TRANSPORT_PEER_ID_MAX;
         message->sequence_number = A_TRANSPORT_SEQUENCE_NUMBER_MAX;
