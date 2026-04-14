@@ -61,7 +61,7 @@ a_Err_t a_Transport_MessageConnect(a_Transport_Message_t *const message, const a
 
         (void)a_Buffer_Clear(&message->buffer);
 
-        size_t size = Leb128_Encode16((a_Transport_Mtu_t)AETHER_TRANSPORT_MTU, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
+        size_t size = Leb128_Encode16(AETHER_TRANSPORT_MTU, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
         (void)a_Buffer_SetWrite(&message->buffer, size);
 
         size = Leb128_Encode64(lease, a_Buffer_GetWrite(&message->buffer), a_Buffer_GetWriteSize(&message->buffer));
