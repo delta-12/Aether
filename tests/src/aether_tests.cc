@@ -44,7 +44,7 @@ protected:
     {
         mock_socket_ = new MockSocket;
         mock_subscriber_ = new MockSubscriber;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = NULL, .stop = NULL, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
+        a_InitializeSocket(&socket_, A_SOCKET_TYPE_SERIAL, (a_SocketFunctions_t){.start = NULL, .stop = NULL, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
     }
 
     void TearDown() override

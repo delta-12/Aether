@@ -59,6 +59,17 @@ void a_EnableRouting(const bool enable)
     a_Routing_EnableRouting(enable);
 }
 
+a_Err_t a_InitializeSocket(a_Socket_t *const socket,
+                           const a_SocketType_t type,
+                           const a_SocketFunctions_t functions,
+                           uint8_t *const send_buffer,
+                           const size_t send_buffer_size,
+                           uint8_t *const receive_buffer,
+                           const size_t receive_buffer_size)
+{
+    return a_Socket_Initialize(socket, type, functions, send_buffer, send_buffer_size, receive_buffer, receive_buffer_size);
+}
+
 a_Err_t a_AddSession(a_Session_t *const session, const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain)
 {
     a_Err_t error = A_ERR_NULL;
