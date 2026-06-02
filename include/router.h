@@ -9,8 +9,6 @@
 
 typedef uint32_t a_Router_SessionId_t;
 
-#define A_TRANSPORT_SESSION_ID_MAX (a_Router_SessionId_t)(UINT64_MAX)
-
 #ifdef __cplusplus
 extern "C"
 {

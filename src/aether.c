@@ -59,9 +59,29 @@ void a_EnableRouting(const bool enable)
     a_Routing_EnableRouting(enable);
 }
 
-a_Err_t a_AddSocket(const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain)
+a_Err_t a_AddSession(a_Session_t *const session, const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain)
 {
-    return a_Router_SessionAdd(a_Random_Get32(), socket, message_buffer, message_buffer_size, retain);
+    a_Err_t error = A_ERR_NULL;
+
+    if (NULL != session)
+    {
+        *session = a_Random_Get32();
+        error    = a_Router_SessionAdd(*session, socket, message_buffer, message_buffer_size, retain);
+    }
+
+    return error;
+}
+
+a_Err_t a_DeleteSession(a_Session_t *const session)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if (NULL != session)
+    {
+        error = a_Router_SessionDelete(*session);
+    }
+
+    return error;
 }
 
 void a_Task(void)

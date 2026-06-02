@@ -57,6 +57,7 @@ protected:
     static MockSocket *mock_socket_;
     static MockSubscriber *mock_subscriber_;
     a_Socket_t socket_;
+    a_Session_t session_;
     std::uint8_t send_buffer_[AETHER_TEST_BUFFER_SIZE];
     std::uint8_t receive_buffer_[AETHER_TEST_BUFFER_SIZE];
     std::uint8_t message_buffer_[AETHER_TRANSPORT_MTU];
@@ -78,13 +79,29 @@ TEST_F(Aether, Deinitialize)
     a_Deinitialize();
 }
 
-TEST_F(Aether, AddSocket)
+TEST_F(Aether, AddSession)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
 
-    ASSERT_EQ(A_ERR_NULL, a_AddSocket(nullptr, message_buffer_, sizeof(message_buffer_), true));
-    ASSERT_EQ(A_ERR_NULL, a_AddSocket(&socket_, nullptr, sizeof(message_buffer_), true));
-    ASSERT_EQ(A_ERR_NONE, a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(nullptr, &socket_, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(&session_, nullptr, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(&session_, &socket_, nullptr, sizeof(message_buffer_), true));
+
+    ASSERT_EQ(A_ERR_SIZE, a_AddSession(&session_, &socket_, message_buffer_, 0U, true));
+
+    ASSERT_EQ(A_ERR_NONE, a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true));
+}
+
+TEST_F(Aether, DeleteSession)
+{
+    a_Initialize(A_TRANSPORT_PEER_ID_MAX);
+
+    ASSERT_EQ(A_ERR_NULL, a_DeleteSession(nullptr));
+
+    ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
+
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
+    ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
 }
 
 TEST_F(Aether, Task)
@@ -103,7 +120,7 @@ TEST_F(Aether, Task)
     std::uint8_t close_message[] = {0x08U, 0x01U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x0AU, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     {
         testing::InSequence sequence;
@@ -217,7 +234,7 @@ TEST_F(Aether, Task)
 TEST_F(Aether, Declare)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Declare(nullptr));
 }
@@ -226,7 +243,7 @@ TEST_F(Aether, Publish)
 {
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Publish(nullptr, data, sizeof(data)));
     ASSERT_EQ(A_ERR_NULL, a_Publish("/foo", nullptr, sizeof(data)));
@@ -239,7 +256,7 @@ TEST_F(Aether, Publish)
 TEST_F(Aether, Subscribe)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Subscribe(nullptr, Callback, nullptr));
     ASSERT_EQ(A_ERR_NULL, a_Subscribe("/foo", nullptr, nullptr));
@@ -250,7 +267,7 @@ TEST_F(Aether, Subscribe)
 TEST_F(Aether, Unsubscribe)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Unsubscribe(nullptr));
 
