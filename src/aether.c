@@ -56,7 +56,7 @@ void a_SetLogLevel(const a_Log_Level_t level)
 
 void a_EnableRouting(const bool enable)
 {
-    a_Routing_EnableRouting(enable);
+    a_Router_RoutingEnable(enable);
 }
 
 a_Err_t a_InitializeSocket(a_Socket_t *const socket,

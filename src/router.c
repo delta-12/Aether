@@ -148,7 +148,7 @@ void a_Router_Deinitialize(void)
     }
 }
 
-void a_Routing_EnableRouting(const bool enable)
+void a_Router_RoutingEnable(const bool enable)
 {
     a_Router_RoutingEnabled = enable;
 
