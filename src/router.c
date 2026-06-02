@@ -22,7 +22,6 @@
 #define AETHER_SESSION_LEASE (a_Tick_Ms_t)500U
 #endif /* AETHER_SESSION_LEASE */
 
-typedef struct a_Router_Deletion          a_Router_Deletion_t;
 typedef struct a_Router_SubscriberSession a_Router_SubscriberSession_t;
 
 typedef enum
@@ -34,12 +33,6 @@ typedef enum
     A_ROUTER_SESSION_STATE_FAILED
 } a_Router_SessionState_t;
 
-struct a_Router_Deletion
-{
-    a_Router_SessionId_t id;
-    a_Router_Deletion_t *next;
-};
-
 typedef struct
 {
     a_Socket_t socket;
@@ -49,7 +42,6 @@ typedef struct
     a_Tick_Ms_t last_renew_received;
     a_Tick_Ms_t last_renew_sent;
     a_Transport_Message_t message;
-    a_Router_Deletion_t deletion;
     bool retain;
     bool accept_sent;
 } a_Router_Session_t;
@@ -72,7 +64,6 @@ static const char *const            a_Router_LogTag                     = "ROUTE
 static a_Transport_PeerId_t         a_Router_PeerId                     = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber             = 0U;
 static bool                         a_Router_RoutingEnabled             = true;
-static a_Router_Deletion_t *        a_Router_DeleteList                 = NULL;
 static bool                         a_Router_SessionsInitialized        = false;
 static bool                         a_Router_SequenceNumbersInitialized = false;
 static bool                         a_Router_SubscriptionsInitialized   = false;
@@ -83,22 +74,22 @@ static a_Hashmap_t                  a_Router_Subscriptions;
 static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
-static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
-static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
-static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
-static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
-static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_SessionHandleUnsubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static a_Err_t a_Router_RemoveSubscriberSession(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id);
+static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionSendSubscriptionsCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
-
-/* TODO when removing sessions or callback (i.e. unsubscribing) from a a_Router_Subscription_t entry, remove the entry itself if both .sessions and .function are NULL */
 
 a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
 {
@@ -151,7 +142,7 @@ void a_Router_Deinitialize(void)
 
     if (a_Router_SubscriptionsInitialized)
     {
-        a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_FreeSubscriptionCallback, NULL);
+        (void)a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_FreeSubscriptionCallback, NULL);
         a_Hashmap_Deinitialize(&a_Router_Subscriptions);
         a_Router_SubscriptionsInitialized = false;
     }
@@ -173,16 +164,12 @@ void a_Routing_EnableRouting(const bool enable)
 
 void a_Router_Task(void)
 {
-    a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionTaskCallback, NULL);
+    a_Err_t error = a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionTaskCallback, NULL);
 
-    while (NULL != a_Router_DeleteList)
+    if (A_ERR_NONE != error)
     {
-        a_Router_Deletion_t *const next = a_Router_DeleteList->next;
-
-        /* TODO handle deletion failure (otherwise session will remain in closed state and SessionClose will continuously be called on it) */
-        (void)a_Router_SessionDelete(a_Router_DeleteList->id);
-
-        a_Router_DeleteList = next;
+        /* TODO pass to event handler */
+        (void)error;
     }
 }
 
@@ -194,14 +181,14 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
     {
         error = A_ERR_NULL;
     }
-    else if (NULL == a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t)))
+    else if (NULL == a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(id)))
     {
         a_Router_Session_t session;
-        error = a_Hashmap_Insert(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t), &session, sizeof(a_Router_Session_t));
+        error = a_Hashmap_Insert(&a_Router_Sessions, &id, sizeof(id), &session, sizeof(a_Router_Session_t));
 
         if (A_ERR_NONE == error)
         {
-            a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
+            a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(id));
 
             new_session->socket = *socket;
             new_session->state  = A_ROUTER_SESSION_STATE_CONNECT;
@@ -218,7 +205,7 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 {
     a_Err_t                   error   = A_ERR_NONE;
-    a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
+    a_Router_Session_t *const session = a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(id));
 
     if (NULL != session)
     {
@@ -238,20 +225,22 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
         if (A_ERR_NONE == error)
         {
-            a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
+            error = a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
+        }
 
-            error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(a_Router_SessionId_t));
+        if (A_ERR_NONE == error)
+        {
+            error = a_Hashmap_Remove(&a_Router_Sessions, &id, sizeof(id));
         }
 
         if (A_ERR_NONE == error)
         {
             A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
         }
-    }
-
-    if (A_ERR_NONE != error)
-    {
-        A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
+        else
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to delete with error %s", id, a_Err_ToString(error));
+        }
     }
 
     return error;
@@ -318,23 +307,26 @@ a_Err_t a_Router_Publish(const char *const key, const uint8_t *const data, const
             {
                 a_Router_Session_t *session = a_Hashmap_Get(&a_Router_Sessions, &subscriber_session->id, sizeof(subscriber_session->id));
 
-                a_Transport_MessageReset(&session->message);
-                a_Err_t send_error = a_Transport_MessagePublish(&session->message, key, data, size);
-
-                if (A_ERR_NONE == send_error)
+                if (NULL != session)
                 {
-                    (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+                    a_Transport_MessageReset(&session->message);
+                    a_Err_t send_error = a_Transport_MessagePublish(&session->message, key, data, size);
 
-                    send_error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
+                    if (A_ERR_NONE == send_error)
+                    {
+                        (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+                        send_error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
+                    }
+
+                    if (A_ERR_NONE != send_error)
+                    {
+                        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
+                        error = send_error;
+                    }
+
+                    subscriber_session = subscriber_session->next;
                 }
-
-                if (A_ERR_NONE != send_error)
-                {
-                    A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
-                    error = send_error;
-                }
-
-                subscriber_session = subscriber_session->next;
             }
 
             a_Router_SequenceNumber++;
@@ -378,12 +370,44 @@ a_Err_t a_Router_Subscribe(const char *const key, void (*callback)(const char *c
 
         if (A_ERR_NONE == error)
         {
-            a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSubscribeCallback, key);
+            (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSubscribeCallback, key);
             a_Router_SequenceNumber++;
         }
         else
         {
             A_LOG_ERROR(a_Router_LogTag, "Failed to register subscription with error %s", a_Err_ToString(error));
+        }
+    }
+
+    return error;
+}
+
+a_Err_t a_Router_Unsubscribe(const char *const key)
+{
+    a_Err_t error = A_ERR_NONE;
+
+    if (NULL == key)
+    {
+        error = A_ERR_NULL;
+    }
+    else
+    {
+        const a_Hash_t           hash         = a_Hash_String(key, a_Transport_GetStringSize(key));
+        a_Router_Subscription_t *subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
+
+        if (NULL != subscription)
+        {
+            subscription->function = NULL;
+            subscription->arg      = NULL;
+
+            if (NULL == subscription->sessions)
+            {
+                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionUnsubscribeCallback, key);
+                a_Router_SequenceNumber++;
+
+                a_free(subscription->key);
+                error = a_Hashmap_Remove(&a_Router_Subscriptions, &hash, sizeof(hash));
+            }
         }
     }
 
@@ -442,45 +466,6 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
     if (A_ERR_NONE != error)
     {
         A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to receive message with error %s", id, a_Err_ToString(error));
-    }
-
-    return error;
-}
-
-static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
-{
-    A_UNUSED(arg);
-    A_UNUSED(key_size);
-    A_UNUSED(value_size);
-
-    (void)a_Router_SessionTask(*(a_Router_SessionId_t *)key, value);
-}
-
-static a_Err_t a_Router_SessionTask(const a_Router_SessionId_t id, a_Router_Session_t *const session)
-{
-    a_Err_t error = A_ERR_NONE;
-
-    switch (session->state)
-    {
-    case A_ROUTER_SESSION_STATE_CONNECT:
-        error = a_Router_SessionConnect(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_ACCEPT:
-        error = a_Router_SessionAccept(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_OPEN:
-        error = a_Router_SessionOpen(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_CLOSED:
-        error = a_Router_SessionClose(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_FAILED:
-        /* Catch and handle failure cases here */
-        session->state = A_ROUTER_SESSION_STATE_CLOSED;
-        break;
-    default:
-        session->state = A_ROUTER_SESSION_STATE_FAILED;
-        break;
     }
 
     return error;
@@ -554,7 +539,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
                 session->last_renew_sent = tick;
                 session->state           = A_ROUTER_SESSION_STATE_OPEN;
 
-                a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
+                (void)a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
                 A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
             }
@@ -586,11 +571,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     a_Err_t           error = a_Router_SessionMessageReceive(id, session);
     const a_Tick_Ms_t tick  = a_Tick_GetTick();
 
-    if (A_ERR_NONE != error)
-    {
-        session->state = A_ROUTER_SESSION_STATE_FAILED;
-    }
-    else if (a_Transport_IsMessageDeserialized(&session->message))
+    if ((A_ERR_NONE == error) && a_Transport_IsMessageDeserialized(&session->message))
     {
         switch (a_Transport_GetMessageHeader(&session->message))
         {
@@ -610,6 +591,10 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             session->last_renew_received = tick;
             error                        = a_Router_SessionHandleSubscribe(id, session);
             break;
+        case A_TRANSPORT_HEADER_UNSUBSCRIBE:
+            session->last_renew_received = tick;
+            error                        = a_Router_SessionHandleUnsubscribe(id, session);
+            break;
         case A_TRANSPORT_HEADER_CONNECT:
         default:
             A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
@@ -619,8 +604,7 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
 
     if (a_Tick_GetElapsed(session->last_renew_received) > session->lease)
     {
-        session->state = A_ROUTER_SESSION_STATE_FAILED;
-        error          = A_ERR_TIMEOUT;
+        error = A_ERR_TIMEOUT;
 
         A_LOG_ERROR(a_Router_LogTag, "Session %#x timed out", id);
     }
@@ -632,6 +616,11 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
         session->last_renew_sent = tick;
     }
 
+    if (A_ERR_NONE != error)
+    {
+        session->state = A_ROUTER_SESSION_STATE_FAILED;
+    }
+
     return error;
 }
 
@@ -639,20 +628,19 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
 {
     a_Err_t error = a_Socket_Stop(&session->socket);
 
-    if (A_ERR_NONE != error)
+    if (session->retain && (A_ERR_NONE == error))
     {
-        /* Failed to stop socket */
-    }
-    else if (session->retain)
-    {
-        a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
-        session->state = A_ROUTER_SESSION_STATE_CONNECT;
+        error = a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_RemoveSubscriberSessionCallback, &id);
+
+        if (A_ERR_NONE == error)
+        {
+            session->state = A_ROUTER_SESSION_STATE_CONNECT;
+        }
     }
     else
     {
-        session->deletion.id   = id;
-        session->deletion.next = a_Router_DeleteList;
-        a_Router_DeleteList    = &session->deletion;
+        /* TODO handle deletion failure (otherwise session will remain in closed state and SessionClose will continuously be called on it) */
+        error = a_Router_SessionDelete(id);
     }
 
     if (A_ERR_NONE == error)
@@ -720,82 +708,6 @@ static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t
     return error;
 }
 
-static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
-{
-    A_UNUSED(key_size);
-    A_UNUSED(value_size);
-
-    a_Router_Session_t *const session = value;
-
-    if (A_ROUTER_SESSION_STATE_OPEN == session->state)
-    {
-        a_Transport_MessageReset(&session->message);
-
-        a_Err_t error = a_Transport_MessageSubscribe(&session->message, arg);
-
-        if (A_ERR_NONE == error)
-        {
-            (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
-
-            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
-        }
-
-        if (A_ERR_NONE != error)
-        {
-            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
-        }
-    }
-}
-
-static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
-{
-    A_UNUSED(key);
-    A_UNUSED(key_size);
-    A_UNUSED(value_size);
-
-    a_Router_Subscription_t *const    subscription       = value;
-    const a_Router_SessionId_t *const id                 = arg;
-    a_Router_SubscriberSession_t *    subscriber_session = subscription->sessions;
-    a_Router_SubscriberSession_t **   previous           = &subscription->sessions;
-
-    while (NULL != subscriber_session)
-    {
-        a_Router_SubscriberSession_t *const next = subscriber_session->next;
-
-        if (*id == subscriber_session->id)
-        {
-            *previous = subscriber_session->next;
-            a_free(subscriber_session);
-            break;
-        }
-
-        previous           = &subscriber_session->next;
-        subscriber_session = next;
-    }
-}
-
-static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
-{
-    A_UNUSED(key);
-    A_UNUSED(key_size);
-    A_UNUSED(value_size);
-    A_UNUSED(arg);
-
-    a_Router_Subscription_t *const subscription       = value;
-    a_Router_SubscriberSession_t * subscriber_session = subscription->sessions;
-
-    a_free(subscription->key);
-
-    while (NULL != subscriber_session)
-    {
-        a_Router_SubscriberSession_t *const next = subscriber_session->next;
-
-        a_free(subscriber_session);
-
-        subscriber_session = next;
-    }
-}
-
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
     a_Err_t                              error           = A_ERR_NONE;
@@ -821,20 +733,23 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
             {
                 a_Router_Session_t *forward_session = a_Hashmap_Get(&a_Router_Sessions, &subscriber_session->id, sizeof(subscriber_session->id));
 
-                a_Transport_MessageReset(&forward_session->message);
-                a_Err_t send_error = a_Transport_MessagePublish(&forward_session->message, subscription->key, data, size);
-
-                if (A_ERR_NONE == send_error)
+                if (NULL != forward_session)
                 {
-                    (void)a_Transport_SerializeMessage(&forward_session->message, peer_id, sequence_number);
+                    a_Transport_MessageReset(&forward_session->message);
+                    a_Err_t send_error = a_Transport_MessagePublish(&forward_session->message, subscription->key, data, size);
 
-                    send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetBuffer(&forward_session->message));
-                }
+                    if (A_ERR_NONE == send_error)
+                    {
+                        (void)a_Transport_SerializeMessage(&forward_session->message, peer_id, sequence_number);
 
-                if (A_ERR_NONE != send_error)
-                {
-                    A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
-                    error = send_error;
+                        send_error = a_Socket_Send(&forward_session->socket, a_Transport_GetBuffer(&forward_session->message));
+                    }
+
+                    if (A_ERR_NONE != send_error)
+                    {
+                        A_LOG_ERROR(a_Router_LogTag, "Session %#x sending publish message with error %s", subscriber_session->id, a_Err_ToString(send_error));
+                        error = send_error;
+                    }
                 }
             }
 
@@ -872,7 +787,7 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
                 new_subscriber_session->next = subscription->sessions;
                 subscription->sessions       = new_subscriber_session;
 
-                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
+                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
             }
         }
         else if (a_Router_RoutingEnabled)
@@ -891,7 +806,7 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
 
             if (A_ERR_NONE == error)
             {
-                a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
+                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
             }
             else
             {
@@ -907,6 +822,175 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
     return error;
 }
 
+static a_Err_t a_Router_SessionHandleUnsubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session)
+{
+    a_Err_t           error    = A_ERR_NONE;
+    const size_t      key_size = a_Transport_GetMessageKeySize(&session->message);
+    const char *const key      = a_Transport_GetMessageKey(&session->message);
+
+    if ((SIZE_MAX != key_size) && (NULL != key))
+    {
+        const a_Hash_t                 hash         = a_Hash_String(key, key_size);
+        a_Router_Subscription_t *const subscription = a_Hashmap_Get(&a_Router_Subscriptions, &hash, sizeof(hash));
+
+        if (NULL != subscription)
+        {
+            error = a_Router_RemoveSubscriberSession(subscription, hash, id);
+        }
+    }
+
+    return error;
+}
+
+static a_Err_t a_Router_RemoveSubscriberSession(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id)
+{
+    a_Err_t                        error              = A_ERR_NONE;
+    a_Router_SubscriberSession_t * subscriber_session = subscription->sessions;
+    a_Router_SubscriberSession_t **previous           = &subscription->sessions;
+
+    while (NULL != subscriber_session)
+    {
+        if (id == subscriber_session->id)
+        {
+            *previous = subscriber_session->next;
+            a_free(subscriber_session);
+            break;
+        }
+
+        previous           = &subscriber_session->next;
+        subscriber_session = subscriber_session->next;
+    }
+
+    if ((NULL == subscription->sessions) && (NULL == subscription->function))
+    {
+        a_free(subscription->key);
+        error = a_Hashmap_Remove(&a_Router_Subscriptions, &hash, sizeof(hash));
+    }
+
+    return error;
+}
+
+static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(arg);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    a_Err_t                    error   = A_ERR_NONE;
+    const a_Router_SessionId_t id      = *(const a_Router_SessionId_t *)key;
+    a_Router_Session_t *const  session = value;
+
+    switch (session->state)
+    {
+    case A_ROUTER_SESSION_STATE_CONNECT:
+        error = a_Router_SessionConnect(id, session);
+        break;
+    case A_ROUTER_SESSION_STATE_ACCEPT:
+        error = a_Router_SessionAccept(id, session);
+        break;
+    case A_ROUTER_SESSION_STATE_OPEN:
+        error = a_Router_SessionOpen(id, session);
+        break;
+    case A_ROUTER_SESSION_STATE_CLOSED:
+        error = a_Router_SessionClose(id, session);
+        break;
+    case A_ROUTER_SESSION_STATE_FAILED:
+        /* Catch and handle failure cases here */
+        session->state = A_ROUTER_SESSION_STATE_CLOSED;
+        break;
+    default:
+        session->state = A_ROUTER_SESSION_STATE_FAILED;
+        break;
+    }
+
+    /* TODO pass error to event handler */
+    (void)error;
+}
+
+static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    a_Router_Session_t *const session = value;
+
+    if (A_ROUTER_SESSION_STATE_OPEN == session->state)
+    {
+        a_Transport_MessageReset(&session->message);
+
+        a_Err_t error = a_Transport_MessageSubscribe(&session->message, arg);
+
+        if (A_ERR_NONE == error)
+        {
+            (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        }
+    }
+}
+
+static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    a_Router_Session_t *const session = value;
+
+    if (A_ROUTER_SESSION_STATE_OPEN == session->state)
+    {
+        a_Transport_MessageReset(&session->message);
+
+        a_Err_t error = a_Transport_MessageUnsubscribe(&session->message, arg);
+
+        if (A_ERR_NONE == error)
+        {
+            (void)a_Transport_SerializeMessage(&session->message, a_Router_PeerId, a_Router_SequenceNumber);
+
+            error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending unsubscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+        }
+    }
+}
+
+static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+
+    (void)a_Router_RemoveSubscriberSession(value, *(const a_Hash_t *const)key, *(const a_Router_SessionId_t *const)arg);
+}
+
+static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+    A_UNUSED(arg);
+
+    a_Router_Subscription_t *const subscription       = value;
+    a_Router_SubscriberSession_t * subscriber_session = subscription->sessions;
+
+    a_free(subscription->key);
+
+    while (NULL != subscriber_session)
+    {
+        a_Router_SubscriberSession_t *const next = subscriber_session->next;
+
+        a_free(subscriber_session);
+
+        subscriber_session = next;
+    }
+}
+
 static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
 {
     A_UNUSED(key_size);
@@ -915,7 +999,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
     const a_Router_Session_t *const session_receive = (const a_Router_Session_t *)arg;
     a_Router_Session_t *const       session         = (a_Router_Session_t *)value;
 
-    if (session_receive != session)
+    if ((session_receive != session) && (A_ROUTER_SESSION_STATE_OPEN == session->state))
     {
         const a_Transport_PeerId_t         peer_id         = a_Transport_GetMessagePeerId(&session_receive->message);
         const a_Transport_SequenceNumber_t sequence_number = a_Transport_GetMessageSequenceNumber(&session_receive->message);
