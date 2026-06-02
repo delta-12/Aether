@@ -395,8 +395,9 @@ a_Transport_Header_t a_Transport_GetMessageHeader(const a_Transport_Message_t *c
         case A_TRANSPORT_HEADER_ACCEPT:
         case A_TRANSPORT_HEADER_CLOSE:
         case A_TRANSPORT_HEADER_RENEW:
-        case A_TRANSPORT_HEADER_SUBSCRIBE:
         case A_TRANSPORT_HEADER_PUBLISH:
+        case A_TRANSPORT_HEADER_SUBSCRIBE:
+        case A_TRANSPORT_HEADER_UNSUBSCRIBE:
             header = message->header;
             break;
         default:

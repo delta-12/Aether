@@ -966,7 +966,7 @@ static void a_Router_RemoveSubscriberSessionCallback(const void *const key, cons
     A_UNUSED(key_size);
     A_UNUSED(value_size);
 
-    (void)a_Router_RemoveSubscriberSession(value, *(const a_Hash_t *const)key, *(a_Router_SessionId_t *)arg);
+    (void)a_Router_RemoveSubscriberSession(value, *(const a_Hash_t *const)key, *(const a_Router_SessionId_t *const)arg);
 }
 
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)

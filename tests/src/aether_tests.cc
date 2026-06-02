@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 
 #include <gmock/gmock.h>
@@ -98,7 +99,8 @@ TEST_F(Aether, Task)
     std::uint8_t subscribe_message_second[] = {0x0DU, 0x01U, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x06U, 0x05U, 0x2FU, 0x62U, 0x61U, 0x7AU, 0x01U, 0x00U};
     std::uint8_t subscribe_message_third[] = {0x0DU, 0x01U, 0x05U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x07U, 0x05U, 0x2FU, 0x71U, 0x75U, 0x78U, 0x01U, 0x00U};
     std::uint8_t publish_message[] = {0x11U, 0x01U, 0x04U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x08U, 0xF8U, 0xABU, 0xE2U, 0xE3U, 0x17U, 0x01U, 0x02U, 0x03U, 0x04U, 0x00U};
-    std::uint8_t close_message[] = {0x08U, 0x01U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x09U, 0x00U};
+    std::uint8_t unsubscribe_message[] = {0x0DU, 0x01U, 0x06U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x09U, 0x05U, 0x2FU, 0x71U, 0x75U, 0x78U, 0x01U, 0x00U};
+    std::uint8_t close_message[] = {0x08U, 0x01U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x0AU, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
     a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
@@ -158,6 +160,10 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(publish_message[i]), testing::Return(1U)));
         }
+        for (std::size_t i = 0U; i < sizeof(unsubscribe_message); i++)
+        {
+            EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(unsubscribe_message[i]), testing::Return(1U)));
+        }
         for (std::size_t i = 0U; i < sizeof(close_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
@@ -200,6 +206,9 @@ TEST_F(Aether, Task)
 
     ASSERT_EQ(A_ERR_NONE, a_Unsubscribe("/foo"));
     a_Task(); // Receive publish
+
+    a_Task(); // Receive unsubscribe
+    ASSERT_EQ(A_ERR_NONE, a_Publish("/qux", data, sizeof(data)));
 
     a_Task(); // Receive close
     a_Task(); // Close session
