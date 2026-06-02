@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "err.h"
+#include "event.h"
 #include "hash.h"
 #include "hashmap.h"
 #include "log.h"
@@ -73,7 +74,7 @@ static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
 static a_Hashmap_t                  a_Router_Subscriptions;
 
-static void a_Router_EventEmit(const a_Router_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error);
+static void a_Router_EventEmit(const a_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error);
 static void a_Router_MessageSerialize(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -106,6 +107,11 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
     }
 
     A_LOG_DEBUG(a_Router_LogTag, "Peer ID set to %#x", a_Router_PeerId);
+
+    a_Router_SequenceNumber  = 0U;
+    a_Router_EventHandler    = NULL;
+    a_Router_EventHandlerArg = NULL;
+    a_Router_RoutingEnabled  = true;
 
     a_Err_t error = a_Hashmap_Initialize(&a_Router_Sessions);
 
@@ -180,7 +186,7 @@ void a_Router_Task(void)
 
     if (A_ERR_NONE != error)
     {
-        a_Router_EventEmit(A_ROUTER_EVENT_ERROR, NULL, &error);
+        a_Router_EventEmit(A_EVENT_ERROR, NULL, &error);
     }
 }
 
@@ -247,6 +253,8 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         if (A_ERR_NONE == error)
         {
             A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
+
+            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
         else
         {
@@ -425,7 +433,7 @@ a_Err_t a_Router_Unsubscribe(const char *const key)
     return error;
 }
 
-static void a_Router_EventEmit(const a_Router_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error)
+static void a_Router_EventEmit(const a_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error)
 {
     if (NULL != a_Router_EventHandler)
     {
@@ -562,7 +570,7 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
 
                 A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
 
-                a_Router_EventEmit(A_ROUTER_EVENT_OPEN, &id, NULL);
+                a_Router_EventEmit(A_EVENT_OPEN, &id, NULL);
             }
         }
         else
@@ -656,6 +664,8 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
         if (A_ERR_NONE == error)
         {
             session->state = A_ROUTER_SESSION_STATE_CONNECT;
+
+            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
     }
     else
@@ -667,8 +677,6 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
     if (A_ERR_NONE == error)
     {
         A_LOG_INFO(a_Router_LogTag, "Session %#x closed", id);
-
-        a_Router_EventEmit(A_ROUTER_EVENT_CLOSE, &id, NULL);
     }
     else
     {
@@ -928,7 +936,7 @@ static void a_Router_SessionTaskCallback(const void *const key, const size_t key
 
     if (A_ERR_NONE != error)
     {
-        a_Router_EventEmit(A_ROUTER_EVENT_ERROR, &id, &error);
+        a_Router_EventEmit(A_EVENT_ERROR, &id, &error);
     }
 }
 

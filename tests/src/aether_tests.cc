@@ -14,12 +14,14 @@ class Subscriber
 {
 public:
     virtual void Callback(const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg) const = 0;
+    virtual void EventHandler(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg) const = 0;
 };
 
 class MockSubscriber : public Subscriber
 {
 public:
     MOCK_METHOD(void, Callback, (const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg), (const, override));
+    MOCK_METHOD(void, EventHandler, (const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg), (const, override));
 };
 
 class Aether : public testing::Test
@@ -38,6 +40,11 @@ protected:
     static void Callback(const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg)
     {
         return mock_subscriber_->Callback(key, data, size, arg);
+    }
+
+    static void EventHandler(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg)
+    {
+        mock_subscriber_->EventHandler(event, session, error, arg);
     }
 
     void SetUp() override
@@ -120,6 +127,7 @@ TEST_F(Aether, Task)
     std::uint8_t close_message[] = {0x08U, 0x01U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x0AU, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
+    a_RegisterEventHandler(EventHandler, nullptr);
     a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     {
@@ -130,11 +138,15 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message_invalid_lease[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_ERROR, testing::Pointee(testing::Eq(session_)), testing::Pointee(testing::Eq(A_ERR_SERIALIZATION)), nullptr)).Times(1);
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(connect_message_invalid_mtu); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message_invalid_mtu[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_ERROR, testing::Pointee(testing::Eq(session_)), testing::Pointee(testing::Eq(A_ERR_SERIALIZATION)), nullptr)).Times(1);
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(connect_message); i++)
         {
@@ -147,6 +159,7 @@ TEST_F(Aether, Task)
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_OPEN, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(renew_message); i++)
@@ -185,6 +198,7 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
     }
 
     a_Task(); // Send connect
@@ -201,7 +215,7 @@ TEST_F(Aether, Task)
 
     a_Task(); // Send connect
     a_Task(); // Receive connect
-    a_Task(); // Send accept
+    a_Task(); // Receive accept
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/bar", Callback, nullptr));
 

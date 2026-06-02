@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "err.h"
+#include "event.h"
 #include "log.h"
 #include "random.h"
 #include "router.h"
@@ -88,7 +89,7 @@ a_Err_t a_AddSession(a_Session_t *const session, const a_Socket_t *const socket,
     return error;
 }
 
-a_Err_t a_DeleteSession(a_Session_t *const session)
+a_Err_t a_DeleteSession(const a_Session_t *const session)
 {
     a_Err_t error = A_ERR_NULL;
 

@@ -4,19 +4,12 @@
 #include <stdbool.h>
 
 #include "err.h"
+#include "event.h"
 #include "socket.h"
 #include "transport.h"
 
 typedef uint32_t a_Router_SessionId_t;
-
-typedef enum
-{
-    A_ROUTER_EVENT_OPEN,
-    A_ROUTER_EVENT_CLOSE,
-    A_ROUTER_EVENT_ERROR
-} a_Router_Event_t;
-
-typedef void (*a_Router_EventHandle_t)(const a_Router_Event_t, const a_Router_SessionId_t *const, const a_Err_t *const, void *);
+typedef void (*a_Router_EventHandle_t)(const a_Event_t, const a_Router_SessionId_t *const, const a_Err_t *const, void *);
 
 #ifdef __cplusplus
 extern "C"
