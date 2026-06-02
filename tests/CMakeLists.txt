@@ -59,6 +59,10 @@ target_include_directories(${AETHER_TEST_TARGET}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_definitions(${AETHER_TEST_TARGET}
+    PRIVATE
+        AETHER_GIT_VERSION_MAJOR=${AETHER_GIT_VERSION_MAJOR}
+)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${AETHER_TEST_TARGET}
         PRIVATE
