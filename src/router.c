@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "err.h"
+#include "event.h"
 #include "hash.h"
 #include "hashmap.h"
 #include "log.h"
@@ -63,6 +64,8 @@ typedef struct
 static const char *const            a_Router_LogTag                     = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId                     = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber             = 0U;
+static a_Router_EventHandle_t       a_Router_EventHandler               = NULL;
+static void *                       a_Router_EventHandlerArg            = NULL;
 static bool                         a_Router_RoutingEnabled             = true;
 static bool                         a_Router_SessionsInitialized        = false;
 static bool                         a_Router_SequenceNumbersInitialized = false;
@@ -71,7 +74,8 @@ static a_Hashmap_t                  a_Router_Sessions;
 static a_Hashmap_t                  a_Router_SequenceNumbers;
 static a_Hashmap_t                  a_Router_Subscriptions;
 
-static void a_Router_SerializeMessage(a_Transport_Message_t *const message);
+static void a_Router_EventEmit(const a_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error);
+static void a_Router_MessageSerialize(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -82,7 +86,7 @@ static a_Err_t a_Router_SessionHandleConnectAndAccept(const a_Router_SessionId_t
 static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleUnsubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
-static a_Err_t a_Router_RemoveSubscriberSession(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id);
+static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id);
 static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
@@ -103,6 +107,11 @@ a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id)
     }
 
     A_LOG_DEBUG(a_Router_LogTag, "Peer ID set to %#x", a_Router_PeerId);
+
+    a_Router_SequenceNumber  = 0U;
+    a_Router_EventHandler    = NULL;
+    a_Router_EventHandlerArg = NULL;
+    a_Router_RoutingEnabled  = true;
 
     a_Err_t error = a_Hashmap_Initialize(&a_Router_Sessions);
 
@@ -148,7 +157,7 @@ void a_Router_Deinitialize(void)
     }
 }
 
-void a_Routing_EnableRouting(const bool enable)
+void a_Router_RoutingEnable(const bool enable)
 {
     a_Router_RoutingEnabled = enable;
 
@@ -162,14 +171,22 @@ void a_Routing_EnableRouting(const bool enable)
     }
 }
 
+void a_Router_EventHandlerRegister(a_Router_EventHandle_t event_handler, void *arg)
+{
+    if (NULL != event_handler)
+    {
+        a_Router_EventHandler    = event_handler;
+        a_Router_EventHandlerArg = arg;
+    }
+}
+
 void a_Router_Task(void)
 {
     a_Err_t error = a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionTaskCallback, NULL);
 
     if (A_ERR_NONE != error)
     {
-        /* TODO pass to event handler */
-        (void)error;
+        a_Router_EventEmit(A_EVENT_ERROR, NULL, &error);
     }
 }
 
@@ -236,6 +253,8 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         if (A_ERR_NONE == error)
         {
             A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
+
+            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
         else
         {
@@ -414,7 +433,15 @@ a_Err_t a_Router_Unsubscribe(const char *const key)
     return error;
 }
 
-static void a_Router_SerializeMessage(a_Transport_Message_t *const message)
+static void a_Router_EventEmit(const a_Event_t event, const a_Router_SessionId_t *const id, const a_Err_t *const error)
+{
+    if (NULL != a_Router_EventHandler)
+    {
+        a_Router_EventHandler(event, id, error, a_Router_EventHandlerArg);
+    }
+}
+
+static void a_Router_MessageSerialize(a_Transport_Message_t *const message)
 {
     (void)a_Transport_SerializeMessage(message, a_Router_PeerId, a_Router_SequenceNumber);
     a_Router_SequenceNumber++;
@@ -422,7 +449,7 @@ static void a_Router_SerializeMessage(a_Transport_Message_t *const message)
 
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    a_Router_SerializeMessage(&session->message);
+    a_Router_MessageSerialize(&session->message);
 
     a_Err_t error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
 
@@ -542,6 +569,8 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
                 (void)a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
                 A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+
+                a_Router_EventEmit(A_EVENT_OPEN, &id, NULL);
             }
         }
         else
@@ -635,6 +664,8 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
         if (A_ERR_NONE == error)
         {
             session->state = A_ROUTER_SESSION_STATE_CONNECT;
+
+            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
     }
     else
@@ -835,14 +866,14 @@ static a_Err_t a_Router_SessionHandleUnsubscribe(const a_Router_SessionId_t id, 
 
         if (NULL != subscription)
         {
-            error = a_Router_RemoveSubscriberSession(subscription, hash, id);
+            error = a_Router_SubscriberSessionRemove(subscription, hash, id);
         }
     }
 
     return error;
 }
 
-static a_Err_t a_Router_RemoveSubscriberSession(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id)
+static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id)
 {
     a_Err_t                        error              = A_ERR_NONE;
     a_Router_SubscriberSession_t * subscriber_session = subscription->sessions;
@@ -903,8 +934,10 @@ static void a_Router_SessionTaskCallback(const void *const key, const size_t key
         break;
     }
 
-    /* TODO pass error to event handler */
-    (void)error;
+    if (A_ERR_NONE != error)
+    {
+        a_Router_EventEmit(A_EVENT_ERROR, &id, &error);
+    }
 }
 
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
@@ -966,7 +999,7 @@ static void a_Router_RemoveSubscriberSessionCallback(const void *const key, cons
     A_UNUSED(key_size);
     A_UNUSED(value_size);
 
-    (void)a_Router_RemoveSubscriberSession(value, *(const a_Hash_t *const)key, *(const a_Router_SessionId_t *const)arg);
+    (void)a_Router_SubscriberSessionRemove(value, *(const a_Hash_t *const)key, *(const a_Router_SessionId_t *const)arg);
 }
 
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
@@ -1042,7 +1075,7 @@ static void a_Router_SessionSendSubscriptionsCallback(const void *const key, con
 
         if (A_ERR_NONE == error)
         {
-            a_Router_SerializeMessage(&session->message);
+            a_Router_MessageSerialize(&session->message);
 
             error = a_Socket_Send(&session->socket, a_Transport_GetBuffer(&session->message));
         }

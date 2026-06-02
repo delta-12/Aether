@@ -4,12 +4,12 @@
 #include <stdbool.h>
 
 #include "err.h"
+#include "event.h"
 #include "socket.h"
 #include "transport.h"
 
 typedef uint32_t a_Router_SessionId_t;
-
-#define A_TRANSPORT_SESSION_ID_MAX (a_Router_SessionId_t)(UINT64_MAX)
+typedef void (*a_Router_EventHandle_t)(const a_Event_t, const a_Router_SessionId_t *const, const a_Err_t *const, void *);
 
 #ifdef __cplusplus
 extern "C"
@@ -18,7 +18,8 @@ extern "C"
 
 a_Err_t a_Router_Initialize(const a_Transport_PeerId_t id);
 void a_Router_Deinitialize(void);
-void a_Routing_EnableRouting(const bool enable);
+void a_Router_RoutingEnable(const bool enable);
+void a_Router_EventHandlerRegister(a_Router_EventHandle_t event_handler, void *arg);
 void a_Router_Task(void);
 a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *const socket, uint8_t *const buffer, const size_t size, const bool retain);
 a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id);

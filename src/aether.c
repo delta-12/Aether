@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "err.h"
+#include "event.h"
 #include "log.h"
 #include "random.h"
 #include "router.h"
@@ -56,12 +57,48 @@ void a_SetLogLevel(const a_Log_Level_t level)
 
 void a_EnableRouting(const bool enable)
 {
-    a_Routing_EnableRouting(enable);
+    a_Router_RoutingEnable(enable);
 }
 
-a_Err_t a_AddSocket(const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain)
+void a_RegisterEventHandler(void (*event_handler)(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg), void *arg)
 {
-    return a_Router_SessionAdd(a_Random_Get32(), socket, message_buffer, message_buffer_size, retain);
+    a_Router_EventHandlerRegister(event_handler, arg);
+}
+
+a_Err_t a_InitializeSocket(a_Socket_t *const socket,
+                           const a_SocketType_t type,
+                           const a_SocketFunctions_t functions,
+                           uint8_t *const send_buffer,
+                           const size_t send_buffer_size,
+                           uint8_t *const receive_buffer,
+                           const size_t receive_buffer_size)
+{
+    return a_Socket_Initialize(socket, type, functions, send_buffer, send_buffer_size, receive_buffer, receive_buffer_size);
+}
+
+a_Err_t a_AddSession(a_Session_t *const session, const a_Socket_t *const socket, uint8_t *const message_buffer, const size_t message_buffer_size, const bool retain)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if (NULL != session)
+    {
+        *session = a_Random_Get32();
+        error    = a_Router_SessionAdd(*session, socket, message_buffer, message_buffer_size, retain);
+    }
+
+    return error;
+}
+
+a_Err_t a_DeleteSession(const a_Session_t *const session)
+{
+    a_Err_t error = A_ERR_NULL;
+
+    if (NULL != session)
+    {
+        error = a_Router_SessionDelete(*session);
+    }
+
+    return error;
 }
 
 void a_Task(void)

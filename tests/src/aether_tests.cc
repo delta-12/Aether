@@ -14,12 +14,14 @@ class Subscriber
 {
 public:
     virtual void Callback(const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg) const = 0;
+    virtual void EventHandler(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg) const = 0;
 };
 
 class MockSubscriber : public Subscriber
 {
 public:
     MOCK_METHOD(void, Callback, (const char *const key, const std::uint8_t *const data, const std::size_t size, void *arg), (const, override));
+    MOCK_METHOD(void, EventHandler, (const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg), (const, override));
 };
 
 class Aether : public testing::Test
@@ -40,11 +42,16 @@ protected:
         return mock_subscriber_->Callback(key, data, size, arg);
     }
 
+    static void EventHandler(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg)
+    {
+        mock_subscriber_->EventHandler(event, session, error, arg);
+    }
+
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
         mock_subscriber_ = new MockSubscriber;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = NULL, .stop = NULL, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
+        a_InitializeSocket(&socket_, A_SOCKET_TYPE_SERIAL, (a_SocketFunctions_t){.start = NULL, .stop = NULL, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
     }
 
     void TearDown() override
@@ -57,6 +64,7 @@ protected:
     static MockSocket *mock_socket_;
     static MockSubscriber *mock_subscriber_;
     a_Socket_t socket_;
+    a_Session_t session_;
     std::uint8_t send_buffer_[AETHER_TEST_BUFFER_SIZE];
     std::uint8_t receive_buffer_[AETHER_TEST_BUFFER_SIZE];
     std::uint8_t message_buffer_[AETHER_TRANSPORT_MTU];
@@ -78,13 +86,29 @@ TEST_F(Aether, Deinitialize)
     a_Deinitialize();
 }
 
-TEST_F(Aether, AddSocket)
+TEST_F(Aether, AddSession)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
 
-    ASSERT_EQ(A_ERR_NULL, a_AddSocket(nullptr, message_buffer_, sizeof(message_buffer_), true));
-    ASSERT_EQ(A_ERR_NULL, a_AddSocket(&socket_, nullptr, sizeof(message_buffer_), true));
-    ASSERT_EQ(A_ERR_NONE, a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(nullptr, &socket_, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(&session_, nullptr, message_buffer_, sizeof(message_buffer_), true));
+    ASSERT_EQ(A_ERR_NULL, a_AddSession(&session_, &socket_, nullptr, sizeof(message_buffer_), true));
+
+    ASSERT_EQ(A_ERR_SIZE, a_AddSession(&session_, &socket_, message_buffer_, 0U, true));
+
+    ASSERT_EQ(A_ERR_NONE, a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true));
+}
+
+TEST_F(Aether, DeleteSession)
+{
+    a_Initialize(A_TRANSPORT_PEER_ID_MAX);
+
+    ASSERT_EQ(A_ERR_NULL, a_DeleteSession(nullptr));
+
+    ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
+
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
+    ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
 }
 
 TEST_F(Aether, Task)
@@ -103,7 +127,8 @@ TEST_F(Aether, Task)
     std::uint8_t close_message[] = {0x08U, 0x01U, 0x02U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x0AU, 0x00U};
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_RegisterEventHandler(EventHandler, nullptr);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     {
         testing::InSequence sequence;
@@ -113,11 +138,15 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message_invalid_lease[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_ERROR, testing::Pointee(testing::Eq(session_)), testing::Pointee(testing::Eq(A_ERR_SERIALIZATION)), nullptr)).Times(1);
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(connect_message_invalid_mtu); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message_invalid_mtu[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_ERROR, testing::Pointee(testing::Eq(session_)), testing::Pointee(testing::Eq(A_ERR_SERIALIZATION)), nullptr)).Times(1);
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(connect_message); i++)
         {
@@ -130,6 +159,7 @@ TEST_F(Aether, Task)
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_OPEN, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(renew_message); i++)
@@ -168,6 +198,7 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
     }
 
     a_Task(); // Send connect
@@ -184,7 +215,7 @@ TEST_F(Aether, Task)
 
     a_Task(); // Send connect
     a_Task(); // Receive connect
-    a_Task(); // Send accept
+    a_Task(); // Receive accept
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/bar", Callback, nullptr));
 
@@ -217,7 +248,7 @@ TEST_F(Aether, Task)
 TEST_F(Aether, Declare)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Declare(nullptr));
 }
@@ -226,7 +257,7 @@ TEST_F(Aether, Publish)
 {
     std::uint8_t data[] = {0x01U, 0x02U, 0x03U, 0x04U};
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Publish(nullptr, data, sizeof(data)));
     ASSERT_EQ(A_ERR_NULL, a_Publish("/foo", nullptr, sizeof(data)));
@@ -239,7 +270,7 @@ TEST_F(Aether, Publish)
 TEST_F(Aether, Subscribe)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Subscribe(nullptr, Callback, nullptr));
     ASSERT_EQ(A_ERR_NULL, a_Subscribe("/foo", nullptr, nullptr));
@@ -250,7 +281,7 @@ TEST_F(Aether, Subscribe)
 TEST_F(Aether, Unsubscribe)
 {
     a_Initialize(A_TRANSPORT_PEER_ID_MAX);
-    a_AddSocket(&socket_, message_buffer_, sizeof(message_buffer_), true);
+    a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
 
     ASSERT_EQ(A_ERR_NULL, a_Unsubscribe(nullptr));
 
