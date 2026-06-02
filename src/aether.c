@@ -59,6 +59,11 @@ void a_EnableRouting(const bool enable)
     a_Router_RoutingEnable(enable);
 }
 
+void a_RegisterEventHandler(void (*event_handler)(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg), void *arg)
+{
+    a_Router_EventHandlerRegister(event_handler, arg);
+}
+
 a_Err_t a_InitializeSocket(a_Socket_t *const socket,
                            const a_SocketType_t type,
                            const a_SocketFunctions_t functions,

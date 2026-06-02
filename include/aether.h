@@ -11,6 +11,7 @@
 #include "socket.h"
 #include "transport.h"
 
+typedef a_Router_Event_t     a_Event_t;
 typedef a_Router_SessionId_t a_Session_t;
 typedef a_Socket_Type_t      a_SocketType_t;
 typedef a_Socket_Functions_t a_SocketFunctions_t;
@@ -24,6 +25,7 @@ a_Err_t a_Initialize(const a_Transport_PeerId_t id);
 void a_Deinitialize(void);
 void a_SetLogLevel(const a_Log_Level_t level);
 void a_EnableRouting(const bool enable);
+void a_RegisterEventHandler(void (*event_handler)(const a_Event_t event, const a_Session_t *const session, const a_Err_t *const error, void *arg), void *arg);
 a_Err_t a_InitializeSocket(a_Socket_t *const socket,
                            const a_SocketType_t type,
                            const a_SocketFunctions_t functions,
