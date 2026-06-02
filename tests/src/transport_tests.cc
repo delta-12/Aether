@@ -250,7 +250,7 @@ TEST(Transport, GetVersion)
     a_Transport_MessageConnect(&message, 1000U);
     a_Transport_SerializeMessage(&message, A_TRANSPORT_PEER_ID_MAX - 1U, A_TRANSPORT_SEQUENCE_NUMBER_MAX - 1U);
     a_Transport_DeserializeMessage(&message);
-    ASSERT_EQ(1U, a_Transport_GetMessageVersion(&message));
+    ASSERT_EQ(AETHER_GIT_VERSION_MAJOR, a_Transport_GetMessageVersion(&message));
 }
 
 TEST(Transport, GetMessageHeader)

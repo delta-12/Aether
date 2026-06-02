@@ -53,8 +53,6 @@ MockSocket *Router::mock_socket_ = nullptr;
 TEST_F(Router, Task)
 {
     a_Router_SessionId_t id = 12345678U;
-    std::uint8_t connect_message[] = {0x01U, 0x08U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x01U, 0xE8U, 0x07U, 0x00U};
-    std::uint8_t accept_message[] = {0x09U, 0x01U, 0xCEU, 0xC2U, 0xF1U, 0x05U, 0x02U, 0xFAU, 0x01U, 0x00U};
     a_Router_Initialize(A_TRANSPORT_PEER_ID_MAX);
 
     a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false);
