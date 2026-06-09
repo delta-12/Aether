@@ -239,12 +239,9 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
 
             a_Transport_MessageReset(&session->message);
             (void)a_Transport_MessageClose(&session->message);
-            error = a_Router_SessionMessageSend(id, session);
+            (void)a_Router_SessionMessageSend(id, session);
 
-            if (A_ERR_NONE == error)
-            {
-                error = a_Socket_Stop(&session->socket);
-            }
+            error = a_Socket_Stop(&session->socket);
         }
 
         if (A_ERR_NONE == error)
@@ -260,8 +257,6 @@ a_Err_t a_Router_SessionDelete(const a_Router_SessionId_t id)
         if (A_ERR_NONE == error)
         {
             A_LOG_DEBUG(a_Router_LogTag, "Session %#x deleted", id);
-
-            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
         else
         {
@@ -679,6 +674,11 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
     {
         /* TODO handle deletion failure (otherwise session will remain in closed state and SessionClose will continuously be called on it) */
         error = a_Router_SessionDelete(id);
+
+        if (A_ERR_NONE == error)
+        {
+            a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
+        }
     }
 
     if (A_ERR_NONE == error)
@@ -985,7 +985,7 @@ static void a_Router_SessionUnsubscribeCallback(const void *const key, const siz
 {
     const a_Router_UnsubscriberSession_t *const unsubscribe_session = (const a_Router_UnsubscriberSession_t *)arg;
 
-    if (unsubscribe_session->id != *(a_Router_SessionId_t *)key)
+    if (unsubscribe_session->id != *(const a_Router_SessionId_t *)key)
     {
         a_Router_UnsubscribeCallback(key, key_size, value, value_size, unsubscribe_session->key);
     }

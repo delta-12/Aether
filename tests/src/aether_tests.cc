@@ -108,6 +108,7 @@ TEST_F(Aether, DeleteSession)
     ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
 
     a_AddSession(&session_, &socket_, message_buffer_, sizeof(message_buffer_), true);
+    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::Return(0U));
     ASSERT_EQ(A_ERR_NONE, a_DeleteSession(&session_));
 }
 
