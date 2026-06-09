@@ -61,6 +61,12 @@ typedef struct
     char *key;
 } a_Router_Subscription_t;
 
+typedef struct
+{
+    a_Router_SessionId_t id;
+    const char *key;
+} a_Router_UnsubscriberSession_t;
+
 static const char *const            a_Router_LogTag                     = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId                     = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber             = 0U;
@@ -90,6 +96,7 @@ static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const s
 static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
+static void a_Router_UnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_RemoveSubscriberSessionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_FreeSubscriptionCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionForwardSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
@@ -421,7 +428,7 @@ a_Err_t a_Router_Unsubscribe(const char *const key)
 
             if (NULL == subscription->sessions)
             {
-                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionUnsubscribeCallback, key);
+                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_UnsubscribeCallback, key);
                 a_Router_SequenceNumber++;
 
                 a_free(subscription->key);
@@ -894,6 +901,13 @@ static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const s
 
     if ((NULL == subscription->sessions) && (NULL == subscription->function))
     {
+        const a_Router_UnsubscriberSession_t unsubscriber_session = {
+            .id  = id,
+            .key = subscription->key,
+        };
+        (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionUnsubscribeCallback, &unsubscriber_session);
+        a_Router_SequenceNumber++;
+
         a_free(subscription->key);
         error = a_Hashmap_Remove(&a_Router_Subscriptions, &hash, sizeof(hash));
     }
@@ -968,6 +982,16 @@ static void a_Router_SessionSubscribeCallback(const void *const key, const size_
 }
 
 static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    const a_Router_UnsubscriberSession_t *const unsubscribe_session = (const a_Router_UnsubscriberSession_t *)arg;
+
+    if (unsubscribe_session->id != *(a_Router_SessionId_t *)key)
+    {
+        a_Router_UnsubscribeCallback(key, key_size, value, value_size, unsubscribe_session->key);
+    }
+}
+
+static void a_Router_UnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
 {
     A_UNUSED(key_size);
     A_UNUSED(value_size);
