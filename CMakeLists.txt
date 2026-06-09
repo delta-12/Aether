@@ -118,7 +118,6 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${AETHER_TARGET}
         PRIVATE
             -Wall -Wextra -Werror -Wpedantic -fdiagnostics-color=always
-            -fPIC
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_COVERAGE}>>:
                 -g --coverage
             >
@@ -129,6 +128,12 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
                 -fsanitize=address -fno-omit-frame-pointer
             >
     )
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+        target_compile_options(${AETHER_TARGET}
+            PRIVATE
+                -fPIC
+        )
+    endif()
     target_link_options(${AETHER_TARGET}
         PRIVATE
             $<$<AND:$<CONFIG:Debug>,$<BOOL:${AETHER_ENABLE_COVERAGE}>>:
