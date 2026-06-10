@@ -158,8 +158,7 @@ TEST_F(Aether, Task)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(accept_message[i]), testing::Return(1U)));
         }
-        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
-        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
+        EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(2).WillRepeatedly(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_OPEN, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
@@ -213,6 +212,7 @@ TEST_F(Aether, Task)
     a_Task(); // Closed
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/foo", Callback, nullptr));
+    ASSERT_EQ(A_ERR_NONE, a_Subscribe("/quux", Callback, nullptr));
 
     a_Task(); // Send connect
     a_Task(); // Receive connect
