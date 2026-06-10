@@ -606,6 +606,11 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
     {
         switch (a_Transport_GetMessageHeader(&session->message))
         {
+        case A_TRANSPORT_HEADER_CONNECT:
+            session->last_renew_received = tick;
+            session->accept_sent         = false;
+            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+            break;
         case A_TRANSPORT_HEADER_ACCEPT:
             break;
         case A_TRANSPORT_HEADER_CLOSE:
@@ -626,7 +631,6 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
             session->last_renew_received = tick;
             error                        = a_Router_SessionHandleUnsubscribe(id, session);
             break;
-        case A_TRANSPORT_HEADER_CONNECT:
         default:
             A_LOG_WARNING(a_Router_LogTag, "Session %#x received invalid header %d", id, a_Transport_GetMessageHeader(&session->message));
             break;
