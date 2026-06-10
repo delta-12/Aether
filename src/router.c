@@ -906,8 +906,11 @@ static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const s
         (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionUnsubscribeCallback, &unsubscriber_session);
         a_Router_SequenceNumber++;
 
-        a_free(subscription->key);
-        error = a_Hashmap_Remove(&a_Router_Subscriptions, &hash, sizeof(hash));
+        if (a_Router_RoutingEnabled)
+        {
+            a_free(subscription->key);
+            error = a_Hashmap_Remove(&a_Router_Subscriptions, &hash, sizeof(hash));
+        }
     }
 
     return error;
