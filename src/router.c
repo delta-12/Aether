@@ -824,8 +824,6 @@ static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_
                 new_subscriber_session->id   = id;
                 new_subscriber_session->next = subscription->sessions;
                 subscription->sessions       = new_subscriber_session;
-
-                (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionForwardSubscribeCallback, session);
             }
         }
         else if (a_Router_RoutingEnabled)
@@ -1075,7 +1073,7 @@ static void a_Router_SessionForwardSubscribeCallback(const void *const key, cons
 
         if (A_ERR_NONE != error)
         {
-            A_LOG_ERROR(a_Router_LogTag, "Session %#x forwarding subscribe message with error %s", *(a_Router_SessionId_t *)key, a_Err_ToString(error));
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x forwarding subscribe message with error %s", *(const a_Router_SessionId_t *)key, a_Err_ToString(error));
         }
     }
 }
@@ -1106,9 +1104,7 @@ static void a_Router_SessionSendSubscriptionsCallback(const void *const key, con
 
         if (A_ERR_NONE != error)
         {
-            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending initial subscribe message with error %s", subscription->key, a_Err_ToString(error));
+            A_LOG_ERROR(a_Router_LogTag, "Session %#x sending initial subscribe message with error %s", *(const a_Router_SessionId_t *)key, a_Err_ToString(error));
         }
-
-        (void)a_Router_SessionOpen(id, session);
     }
 }
