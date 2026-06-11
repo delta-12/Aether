@@ -214,10 +214,11 @@ a_Err_t a_Router_SessionAdd(const a_Router_SessionId_t id, const a_Socket_t *con
         {
             a_Router_Session_t *new_session = (a_Router_Session_t *)a_Hashmap_Get(&a_Router_Sessions, &id, sizeof(id));
 
-            new_session->socket = *socket;
-            new_session->state  = A_ROUTER_SESSION_STATE_CONNECT;
-            new_session->retain = retain;
-            error               = a_Transport_MessageInitialize(&new_session->message, buffer, size);
+            new_session->socket  = *socket;
+            new_session->state   = A_ROUTER_SESSION_STATE_CONNECT;
+            new_session->retries = 0U;
+            new_session->retain  = retain;
+            error                = a_Transport_MessageInitialize(&new_session->message, buffer, size);
 
             A_LOG_DEBUG(a_Router_LogTag, "Session %#x added", id);
         }
@@ -510,14 +511,12 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
 
         a_Transport_MessageReset(&session->message);
         (void)a_Transport_MessageConnect(&session->message, session->lease);
-
         error = a_Router_SessionMessageSend(id, session);
     }
 
     if (A_ERR_NONE == error)
     {
         session->state               = A_ROUTER_SESSION_STATE_ACCEPT;
-        session->retries             = 1U;
         session->last_renew_received = a_Tick_GetTick();
         session->accept_sent         = false;
 
@@ -535,56 +534,46 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
 
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    a_Err_t error = A_ERR_NONE;
+    const a_Tick_Ms_t tick  = a_Tick_GetTick();
+    a_Err_t           error = a_Router_SessionMessageReceive(id, session);
 
-    if (session->retries <= AETHER_SESSION_RETRIES)
+    if (A_ERR_NONE != error)
     {
-        const a_Tick_Ms_t tick = a_Tick_GetTick();
-
-        if (a_Tick_GetElapsed(session->last_renew_received) > (session->lease * session->retries))
+        /* Error receiving message or no message received */
+    }
+    else if (!a_Transport_IsMessageDeserialized(&session->message))
+    {
+        if (a_Tick_GetElapsed(session->last_renew_received) > (session->lease + (session->lease * session->retries)))
         {
+            session->state = A_ROUTER_SESSION_STATE_CONNECT;
             session->retries++;
-            session->last_renew_received = tick;
         }
+    }
+    else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
+    {
+        error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+        session->last_renew_received = tick;
+    }
+    else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
+    {
+        error                        = a_Router_SessionHandleConnectAndAccept(id, session);
+        session->last_renew_received = tick;
 
-        error = a_Router_SessionMessageReceive(id, session);
-
-        if ((A_ERR_NONE != error) || !a_Transport_IsMessageDeserialized(&session->message))
+        if (session->accept_sent)
         {
-            /* Error receiving message or no message received */
-        }
-        else if (A_TRANSPORT_HEADER_CONNECT == a_Transport_GetMessageHeader(&session->message))
-        {
-            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-            session->last_renew_received = tick;
-        }
-        else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
-        {
-            error                        = a_Router_SessionHandleConnectAndAccept(id, session);
-            session->last_renew_received = tick;
+            (void)a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
 
-            if (session->accept_sent)
-            {
-                session->last_renew_sent = tick;
-                session->state           = A_ROUTER_SESSION_STATE_OPEN;
+            session->state               = A_ROUTER_SESSION_STATE_OPEN;
+            session->last_renew_received = a_Tick_GetTick();
+            session->last_renew_sent     = tick;
 
-                (void)a_Hashmap_ForEach(&a_Router_Subscriptions, a_Router_SessionSendSubscriptionsCallback, &id);
-
-                A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
-
-                a_Router_EventEmit(A_EVENT_OPEN, &id, NULL);
-            }
-        }
-        else
-        {
-            error = A_ERR_SEQUENCE;
+            A_LOG_INFO(a_Router_LogTag, "Session %#x opened", id);
+            a_Router_EventEmit(A_EVENT_OPEN, &id, NULL);
         }
     }
     else
     {
-        session->state = A_ROUTER_SESSION_STATE_CLOSED;
-
-        A_LOG_WARNING(a_Router_LogTag, "Session %#x not opened", id);
+        error = A_ERR_SEQUENCE;
     }
 
     if (A_ERR_NONE != error)
@@ -592,6 +581,12 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
         session->state = A_ROUTER_SESSION_STATE_FAILED;
 
         A_LOG_ERROR(a_Router_LogTag, "Session %#x failed to open with error %s", id, a_Err_ToString(error));
+    }
+    else if (session->retries >= AETHER_SESSION_RETRIES)
+    {
+        session->state = A_ROUTER_SESSION_STATE_CLOSED;
+
+        A_LOG_WARNING(a_Router_LogTag, "Session %#x not opened", id);
     }
 
     return error;
@@ -669,7 +664,8 @@ static a_Err_t a_Router_SessionClose(const a_Router_SessionId_t id, a_Router_Ses
 
         if (A_ERR_NONE == error)
         {
-            session->state = A_ROUTER_SESSION_STATE_CONNECT;
+            session->state   = A_ROUTER_SESSION_STATE_CONNECT;
+            session->retries = 0U;
 
             a_Router_EventEmit(A_EVENT_CLOSE, &id, NULL);
         }
