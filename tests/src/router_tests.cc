@@ -1,4 +1,6 @@
+#include <chrono>
 #include <cstdint>
+#include <thread>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -14,6 +16,11 @@
 class Router : public testing::Test
 {
 protected:
+    static a_Err_t Start(void *arg)
+    {
+        return mock_socket_->Start(arg);
+    }
+
     static a_Err_t Stop(void *arg)
     {
         return mock_socket_->Stop(arg);
@@ -32,7 +39,7 @@ protected:
     void SetUp() override
     {
         mock_socket_ = new MockSocket;
-        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = nullptr, .stop = Stop, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
+        a_Socket_Initialize(&socket_, A_SOCKET_TYPE_SERIAL, (a_Socket_Functions_t){.start = Start, .stop = Stop, .send = Send, .receive = Receive}, send_buffer_, sizeof(send_buffer_), receive_buffer_, sizeof(receive_buffer_));
     }
 
     void TearDown() override
@@ -57,12 +64,24 @@ TEST_F(Router, Task)
 
     a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false);
     ASSERT_EQ(A_ERR_DUPLICATE, a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false));
+    EXPECT_CALL(*mock_socket_, Start(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
     EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::Return(SIZE_MAX));
     EXPECT_CALL(*mock_socket_, Stop(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
     a_Router_Task(); // Send connect
     a_Router_Task(); // Failed
     a_Router_Task(); // Closed
     ASSERT_EQ(A_ERR_NONE, a_Router_SessionAdd(id, &socket_, message_buffer_, sizeof(message_buffer_), false));
+
+    EXPECT_CALL(*mock_socket_, Start(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
+    EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(3).WillRepeatedly(testing::ReturnArg<1>());
+    EXPECT_CALL(*mock_socket_, Receive(testing::_, testing::_, testing::_)).Times(2).WillRepeatedly(testing::Return(0U));
+    a_Router_Task(); // Send connect
+    std::this_thread::sleep_for(std::chrono::milliseconds(501));
+    a_Router_Task(); // Reset to connect
+    a_Router_Task(); // Send connect
+    std::this_thread::sleep_for(std::chrono::milliseconds(1001));
+    a_Router_Task(); // Reset to connect
+    a_Router_Task(); // Send connect
 }
 
 TEST_F(Router, SessionDelete)
