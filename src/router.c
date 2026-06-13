@@ -503,7 +503,12 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
 
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
-    a_Err_t error = a_Socket_Start(&session->socket);
+    a_Err_t error = A_ERR_NONE;
+
+    if (0U == session->retries)
+    {
+        error = a_Socket_Start(&session->socket);
+    }
 
     if (A_ERR_NONE == error)
     {
