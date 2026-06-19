@@ -45,6 +45,7 @@ typedef struct
     a_Transport_Message_t message;
     bool retain;
     bool accept_sent;
+    bool pending;
 } a_Router_Session_t;
 
 struct a_Router_SubscriberSession
@@ -70,6 +71,7 @@ typedef struct
 static const char *const            a_Router_LogTag                     = "ROUTER";
 static a_Transport_PeerId_t         a_Router_PeerId                     = 0U;
 static a_Transport_SequenceNumber_t a_Router_SequenceNumber             = 0U;
+static bool                         a_Router_Pending                    = false;
 static a_Router_EventHandle_t       a_Router_EventHandler               = NULL;
 static void *                       a_Router_EventHandlerArg            = NULL;
 static bool                         a_Router_RoutingEnabled             = true;
@@ -84,6 +86,7 @@ static void a_Router_EventEmit(const a_Event_t event, const a_Router_SessionId_t
 static void a_Router_MessageSerialize(a_Transport_Message_t *const message);
 static a_Err_t a_Router_SessionMessageSend(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_Router_Session_t *const session);
+static void a_Router_SessionPendingSet(a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Session_t *const session);
@@ -93,6 +96,7 @@ static a_Err_t a_Router_SessionHandlePublish(const a_Router_SessionId_t id, a_Ro
 static a_Err_t a_Router_SessionHandleSubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SessionHandleUnsubscribe(const a_Router_SessionId_t id, a_Router_Session_t *const session);
 static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const subscription, const a_Hash_t hash, const a_Router_SessionId_t id);
+static void a_Router_SessionSetPendingCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionSubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
 static void a_Router_SessionUnsubscribeCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg);
@@ -189,7 +193,15 @@ void a_Router_EventHandlerRegister(a_Router_EventHandle_t event_handler, void *a
 
 void a_Router_Task(void)
 {
+    a_Router_Pending = false;
+    (void)a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionSetPendingCallback, NULL);
+
     a_Err_t error = a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionTaskCallback, NULL);
+    while (a_Router_Pending && (A_ERR_NONE == error))
+    {
+        a_Router_Pending = false;
+        error            = a_Hashmap_ForEach(&a_Router_Sessions, a_Router_SessionTaskCallback, NULL);
+    }
 
     if (A_ERR_NONE != error)
     {
@@ -501,6 +513,12 @@ static a_Err_t a_Router_SessionMessageReceive(const a_Router_SessionId_t id, a_R
     return error;
 }
 
+static void a_Router_SessionPendingSet(a_Router_Session_t *const session)
+{
+    session->pending = true;
+    a_Router_Pending = true;
+}
+
 static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_Session_t *const session)
 {
     a_Err_t error = A_ERR_NONE;
@@ -524,6 +542,8 @@ static a_Err_t a_Router_SessionConnect(const a_Router_SessionId_t id, a_Router_S
         session->state               = A_ROUTER_SESSION_STATE_ACCEPT;
         session->last_renew_received = a_Tick_GetTick();
         session->accept_sent         = false;
+
+        a_Router_SessionPendingSet(session);
 
         A_LOG_DEBUG(a_Router_LogTag, "Session %#x connecting", id);
     }
@@ -558,11 +578,21 @@ static a_Err_t a_Router_SessionAccept(const a_Router_SessionId_t id, a_Router_Se
     {
         error                        = a_Router_SessionHandleConnectAndAccept(id, session);
         session->last_renew_received = tick;
+
+        if (A_ERR_NONE == error)
+        {
+            a_Router_SessionPendingSet(session);
+        }
     }
     else if (A_TRANSPORT_HEADER_ACCEPT == a_Transport_GetMessageHeader(&session->message))
     {
         error                        = a_Router_SessionHandleConnectAndAccept(id, session);
         session->last_renew_received = tick;
+
+        if (A_ERR_NONE == error)
+        {
+            a_Router_SessionPendingSet(session);
+        }
 
         if (session->accept_sent)
         {
@@ -604,6 +634,8 @@ static a_Err_t a_Router_SessionOpen(const a_Router_SessionId_t id, a_Router_Sess
 
     if ((A_ERR_NONE == error) && a_Transport_IsMessageDeserialized(&session->message))
     {
+        a_Router_SessionPendingSet(session);
+
         switch (a_Transport_GetMessageHeader(&session->message))
         {
         case A_TRANSPORT_HEADER_CONNECT:
@@ -921,42 +953,58 @@ static a_Err_t a_Router_SubscriberSessionRemove(a_Router_Subscription_t *const s
     return error;
 }
 
+static void a_Router_SessionSetPendingCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
+{
+    A_UNUSED(key);
+    A_UNUSED(key_size);
+    A_UNUSED(value_size);
+    A_UNUSED(arg);
+
+    ((a_Router_Session_t *)value)->pending = true;
+}
+
 static void a_Router_SessionTaskCallback(const void *const key, const size_t key_size, void *const value, const size_t value_size, const void *const arg)
 {
     A_UNUSED(arg);
     A_UNUSED(key_size);
     A_UNUSED(value_size);
 
-    a_Err_t                    error   = A_ERR_NONE;
-    const a_Router_SessionId_t id      = *(const a_Router_SessionId_t *)key;
-    a_Router_Session_t *const  session = value;
+    a_Router_Session_t *const session = value;
 
-    switch (session->state)
+    if (session->pending)
     {
-    case A_ROUTER_SESSION_STATE_CONNECT:
-        error = a_Router_SessionConnect(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_ACCEPT:
-        error = a_Router_SessionAccept(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_OPEN:
-        error = a_Router_SessionOpen(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_CLOSED:
-        error = a_Router_SessionClose(id, session);
-        break;
-    case A_ROUTER_SESSION_STATE_FAILED:
-        /* Catch and handle failure cases here */
-        session->state = A_ROUTER_SESSION_STATE_CLOSED;
-        break;
-    default:
-        session->state = A_ROUTER_SESSION_STATE_FAILED;
-        break;
-    }
+        a_Err_t                    error = A_ERR_NONE;
+        const a_Router_SessionId_t id    = *(const a_Router_SessionId_t *)key;
 
-    if (A_ERR_NONE != error)
-    {
-        a_Router_EventEmit(A_EVENT_ERROR, &id, &error);
+        session->pending = false;
+
+        switch (session->state)
+        {
+        case A_ROUTER_SESSION_STATE_CONNECT:
+            error = a_Router_SessionConnect(id, session);
+            break;
+        case A_ROUTER_SESSION_STATE_ACCEPT:
+            error = a_Router_SessionAccept(id, session);
+            break;
+        case A_ROUTER_SESSION_STATE_OPEN:
+            error = a_Router_SessionOpen(id, session);
+            break;
+        case A_ROUTER_SESSION_STATE_CLOSED:
+            error = a_Router_SessionClose(id, session);
+            break;
+        case A_ROUTER_SESSION_STATE_FAILED:
+            /* Catch and handle failure cases here */
+            session->state = A_ROUTER_SESSION_STATE_CLOSED;
+            break;
+        default:
+            session->state = A_ROUTER_SESSION_STATE_FAILED;
+            break;
+        }
+
+        if (A_ERR_NONE != error)
+        {
+            a_Router_EventEmit(A_EVENT_ERROR, &id, &error);
+        }
     }
 }
 

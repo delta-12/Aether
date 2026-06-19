@@ -74,7 +74,7 @@ TEST_F(Router, Task)
 
     EXPECT_CALL(*mock_socket_, Start(testing::_)).Times(1).WillOnce(testing::Return(A_ERR_NONE));
     EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(3).WillRepeatedly(testing::ReturnArg<1>());
-    EXPECT_CALL(*mock_socket_, Receive(testing::_, testing::_, testing::_)).Times(2).WillRepeatedly(testing::Return(0U));
+    EXPECT_CALL(*mock_socket_, Receive(testing::_, testing::_, testing::_)).Times(5).WillRepeatedly(testing::Return(0U));
     a_Router_Task(); // Send connect
     std::this_thread::sleep_for(std::chrono::milliseconds(501));
     a_Router_Task(); // Reset to connect

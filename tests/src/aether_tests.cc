@@ -161,6 +161,7 @@ TEST_F(Aether, Task)
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(2).WillRepeatedly(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_OPEN, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(renew_message); i++)
@@ -172,34 +173,41 @@ TEST_F(Aether, Task)
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(connect_message_second[i]), testing::Return(1U)));
         }
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(subscribe_message_first); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_first[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(subscribe_message_second); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_second[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(subscribe_message_third); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(subscribe_message_third[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(publish_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(publish_message[i]), testing::Return(1U)));
         }
         EXPECT_CALL(*mock_subscriber_, Callback(testing::StrEq("/foo"), testing::_, testing::_, nullptr)).With(testing::Args<1, 2>(testing::ElementsAreArray(data, sizeof(data)))).Times(1);
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         EXPECT_CALL(*mock_socket_, Send(testing::_, testing::_, testing::_)).Times(1).WillOnce(testing::ReturnArg<1>());
         for (std::size_t i = 0U; i < sizeof(publish_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(publish_message[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(unsubscribe_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(unsubscribe_message[i]), testing::Return(1U)));
         }
+        EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::Return(0U));
         for (std::size_t i = 0U; i < sizeof(close_message); i++)
         {
             EXPECT_CALL(*mock_socket_, Receive(testing::_, 1U, testing::_)).Times(1).WillOnce(testing::DoAll(testing::SetArgPointee<0>(close_message[i]), testing::Return(1U)));
@@ -207,28 +215,23 @@ TEST_F(Aether, Task)
         EXPECT_CALL(*mock_subscriber_, EventHandler(A_EVENT_CLOSE, testing::Pointee(testing::Eq(session_)), nullptr, nullptr)).Times(1);
     }
 
-    a_Task(); // Send connect
-    a_Task(); // Receive connect with invalid lease
+    a_Task(); // Send connect, receive connect with invalid lease
     a_Task(); // Failed
     a_Task(); // Closed
 
-    a_Task(); // Send connect
-    a_Task(); // Receive connect with invalid MTU
+    a_Task(); // Send connect, receive connect with invalid MTU
     a_Task(); // Failed
     a_Task(); // Closed
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/foo", Callback, nullptr));
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/quux", Callback, nullptr));
 
-    a_Task(); // Send connect
-    a_Task(); // Receive connect
-    a_Task(); // Receive accept
+    a_Task(); // Send connect, receive connect, receive accept
 
     ASSERT_EQ(A_ERR_NONE, a_Subscribe("/bar", Callback, nullptr));
 
     a_Task(); // Do nothing
-    a_Task(); // Receive renew
-    a_Task(); // Receive connect
+    a_Task(); // Receive renew, receive connect
 
     a_EnableRouting(false);
     a_Task(); // Receive subscribe first
@@ -249,8 +252,7 @@ TEST_F(Aether, Task)
     a_Task(); // Receive unsubscribe
     ASSERT_EQ(A_ERR_NONE, a_Publish("/qux", data, sizeof(data)));
 
-    a_Task(); // Receive close
-    a_Task(); // Close session
+    a_Task(); // Receive close, Close session
 }
 
 TEST_F(Aether, Declare)
